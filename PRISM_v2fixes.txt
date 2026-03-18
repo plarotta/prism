@@ -1,0 +1,71 @@
+PRISM Architecture
+Debugging Dropped Components: Interference & Covariance Pooling
+Follow-Up Analysis  •  March 2026
+Executive Summary
+Phase 1 ablations showed that two of PRISM’s theoretically motivated components — cross-scale interference and attentive covariance pooling — failed to improve quality. Interference contributed less than 0.01 MRR; covariance pooling was actively harmful, losing 3.4 MRR points to simple mean pooling. These components were dropped for the simplified architecture that proceeded to Phase 2 and Phase 3.
+A code-level review has identified specific numerical and initialization issues that explain these failures. In each case, the theoretical mechanism is sound, but the implementation has scaling, normalization, or initialization problems that prevent the mechanism from learning effectively. The issues are analogous to the well-known instability of dot-product attention before the introduction of 1/√dₖ scaling.
+This document catalogs each issue with code-level evidence, proposes targeted fixes, and outlines an ablation plan to validate them.
+1. Cross-Scale Interference
+The interference module computes bilinear cross-channel interactions: each channel’s hidden state is enriched by multiplicative features from every other channel. The mechanism is m⁽ᶜ⁾ = h⁽ᶜ⁾ + Σ αᴄ,ᴄ′ · (U h⁽ᶜ⁾) ⊙ (V h⁽ᶜ′⁾). Three compounding problems prevent this from learning.
+1.1  Triple-Zero Initialization Creates a Dead Start
+Severity: Critical  —  This alone is sufficient to explain why interference is inert.
+The current initialization:
+
+
+The interference contribution is UH × (α @ VH). At initialization, α is exactly zero, so the output is exactly zero regardless of U and V. The gradient of loss with respect to α is proportional to UH × VH, but since U and V have standard deviation 0.02, this gradient signal is on the order of 0.02² = 0.0004. This is a vanishingly weak learning signal for α to escape zero.
+This follows the ReZero pattern (initializing residual branches at zero), but ReZero works when the other terms in the product are well-scaled. Here, every factor in the product is simultaneously near zero, creating a gradient desert.
+1.2  No Magnitude Normalization Across Channels
+Severity: High  —  Causes unstable gradient flow across channel pairs.
+The bilinear product (U @ h) ⊙ (V @ h) has no scaling factor. The hidden states across channels have wildly different magnitudes because the decay rates span from λ₀ ≈ 0 (memoryless, small activations) to λ_{C-1} ≈ 1 (slow decay, accumulates across the full sequence). The slowest channel’s hidden states can be orders of magnitude larger than the fastest channel’s. The interference term mixes these without any normalization, so the scale of the bilinear product is unpredictable and channel-dependent.
+This is directly analogous to the problem that 1/√dₖ scaling solved for dot-product attention. Without it, the variance of the dot product grows with dimension, pushing softmax into saturated regions. Here, the variance of the bilinear product grows with the accumulated hidden state magnitude, which varies per channel and per sequence length.
+Estimated relative hidden state magnitudes by channel (seq_len=512):
+
+
+1.3  Raw Additive Residual Suppresses Learning
+Severity: Medium  —  Prevents amplification of learned interference signal.
+The residual connection is:
+
+
+This is a raw additive residual with no gating. Even if interference learned something useful, the direct path through H dominates because interference starts at zero and has weak gradients. There is no mechanism to amplify the interference signal relative to the identity path. In contrast, Transformer attention uses a full projection (Wₒ) after the attention computation, giving the model capacity to scale and transform the attended output before it enters the residual stream.
+1.4  Proposed Fixes
+Each fix is minimal and targeted. They should be tested incrementally.
+Pre-normalize hidden states per channel before the bilinear product using LayerNorm or RMSNorm, so all channels operate at unit scale regardless of decay rate.
+Scale the bilinear product by 1/√dᴄ — the exact analogy to attention scaling. This bounds the variance of the product regardless of input magnitude.
+Initialize α to 1/(C−1) instead of zero, so cross-channel information flows from step one. The model learns to suppress channels it does not need, rather than having to discover cross-channel value from scratch.
+Replace the raw residual with a learned gate: mixed = H + sigmoid(γ) × interference, where γ is a learnable scalar initialized to 0. This preserves the ReZero property on the interference path, but now the gate can amplify the signal once gradients start flowing through the normalized, scaled bilinear product.
+
+Pseudocode for the corrected interference forward pass:
+
+2. Attentive Covariance Pooling
+The pooling module fuses two streams: an attentive weighted mean (Stream 1) and a low-rank covariance sketch (Stream 2). The covariance stream captures second-order statistics — how features co-vary across positions — which should provide richer representations than first-order means alone. Two scaling issues prevent this from working.
+2.1  Dimensionality Imbalance Drowns the Attentive Stream
+Severity: High  —  The semantic signal is outnumbered by noisy covariance features.
+With cov_rank=32, the covariance sketch produces a 32×32 = 1024-dimensional vector. The attentive stream produces a d-dimensional vector (384 for prism_small). The concatenated input to out_proj is therefore 384 + 1024 = 1408 dimensions, where covariance features outnumber attention features nearly 3:1.
+
+
+The linear projection out_proj has no structural reason to favor the semantically meaningful attentive stream over the noisy covariance features, especially early in training when covariance features are essentially random second-order statistics. The higher-dimensional stream dominates by sheer parameter count in the projection layer.
+2.2  No Scale Normalization Between Streams
+Severity: High  —  Causes scale mismatch that wastes projection capacity.
+The covariance computation:
+
+
+This raw covariance has magnitude that depends on the norms of P and Q’s outputs, which vary with sequence content and length. Meanwhile, e₁ (the attention-weighted mean) is bounded by the norms of token representations. The two streams operate at completely different and unpredictable scales, forcing the out_proj linear layer to waste capacity learning a scale-matching transformation instead of learning to extract useful features.
+Contrast this with mean pooling, which produces a representation in the same space and at the same scale as the input tokens. No scale mismatch, no dimensionality imbalance. This is why mean pooling wins by 3.4 MRR points — it is not that covariance is theoretically wrong, it is that the implementation has uncontrolled scale.
+2.3  Proposed Fixes
+LayerNorm e₂ before concatenation so it is on the same scale as e₁. This is the minimal fix and should be tested first.
+Reduce cov_rank from 32 to 8 (output: 64 dims instead of 1024). The attentive stream should dominate; the covariance stream should be a supplementary signal, not 3× the dimensionality. With rank 8, the combined input is 384 + 64 = 448 dimensions, an 86%/14% split favoring the semantic stream.
+Project the covariance down to d dimensions instead of using vec(cov). Add a small linear layer cov_proj: (r² → d) so both streams contribute d dimensions to the output projection. This fully eliminates the dimensionality imbalance regardless of cov_rank.
+
+Pseudocode for the corrected pooling forward pass:
+
+3. Issue Summary
+
+
+
+4. Proposed Ablation Plan
+To validate these fixes, we propose a focused ablation study using the same synthetic contrastive setup from Phase 1 (seq_len_q=256, seq_len_p=512, 2000 steps). Each variant isolates one fix to measure its independent contribution, followed by a combined variant.
+
+
+4.1  Success Criteria
+The fixes are considered successful if the combined variant (G) achieves MRR within 0.5 points of the current simplified PRISM (mean pooling, no interference) on the Phase 1 long-sequence benchmark. A bonus outcome would be Variant G exceeding the simplified architecture, which would restore both components for the final model.
+Even if the combined result is neutral, confirming that individual fixes (A–F) show measurable signal validates the theoretical grounding and informs future work at larger scale, where the additional representational capacity may become beneficial.

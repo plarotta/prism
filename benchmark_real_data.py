@@ -151,10 +151,13 @@ def load_long_documents(tokenizer, n_docs=5000, min_len=256):
     Returns list of (doc_ids, article_id) where article_id groups related docs.
     """
     # Try Wikipedia (new HF path)
-    for wiki_path in ["wikimedia/wikipedia", "wikipedia"]:
+    for wiki_path, wiki_config in [
+        ("wikimedia/wikipedia", "20231101.en"),
+        ("wikipedia", "20220301.en"),
+    ]:
         try:
-            print(f"Loading Wikipedia paragraphs ({wiki_path})...")
-            ds = load_dataset(wiki_path, "20220301.en", split="train", streaming=True)
+            print(f"Loading Wikipedia paragraphs ({wiki_path}, {wiki_config})...")
+            ds = load_dataset(wiki_path, wiki_config, split="train", streaming=True)
             documents = []
             article_id = 0
             for article in ds:
@@ -487,91 +490,193 @@ def run_phase_3a(tokenizer, train_pairs, sts_examples, n_steps=2000):
 # 3B: Length-controlled retrieval (the money experiment)
 # ---------------------------------------------------------------------------
 
-def run_phase_3b(tokenizer, train_pairs, documents, n_steps=2000):
+def make_article_pairs(documents, min_len=128):
+    """Create contrastive training pairs from same-article document chunks.
+
+    Two chunks from the same article = positive pair. In-batch negatives provide
+    negative signal. Returns list of (chunk_a_ids, chunk_b_ids).
+    """
+    from collections import defaultdict
+    article_docs = defaultdict(list)
+    for ids, aid in documents:
+        article_docs[aid].append(ids)
+
+    pairs = []
+    for aid, docs in article_docs.items():
+        if len(docs) >= 2:
+            for i in range(len(docs) - 1):
+                if len(docs[i]) >= min_len and len(docs[i + 1]) >= min_len:
+                    pairs.append((docs[i], docs[i + 1]))
+    random.shuffle(pairs)
+    return pairs
+
+
+def train_contrastive_long(model_wrapper, doc_pairs, n_steps, model_name,
+                           max_len=512, lr=3e-4):
+    """Train with InfoNCE on long document pairs."""
+    optimizer = torch.optim.AdamW(model_wrapper.parameters(), lr=lr, weight_decay=0.01)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_steps, eta_min=1e-5)
+
+    losses = []
+    accuracies = []
+    model_wrapper.train()
+    batch_size = min(BATCH_SIZE, 16)  # smaller batch for longer sequences
+
+    print(f"\nTraining {model_name} ({n_steps} steps, max_len={max_len}, batch={batch_size})...")
+    t0 = time.perf_counter()
+
+    for step in range(n_steps):
+        batch_pairs = random.choices(doc_pairs, k=batch_size)
+        q_ids, q_mask, p_ids, p_mask = collate_pairs(batch_pairs, max_len)
+        q_ids, q_mask = q_ids.to(DEVICE), q_mask.to(DEVICE)
+        p_ids, p_mask = p_ids.to(DEVICE), p_mask.to(DEVICE)
+
+        result = model_wrapper(q_ids, q_mask, p_ids, p_mask)
+        loss = result["loss"]
+        acc = result["accuracy"]
+
+        optimizer.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model_wrapper.parameters(), 1.0)
+        optimizer.step()
+        scheduler.step()
+
+        losses.append(loss.item())
+        accuracies.append(acc.item())
+
+        if (step + 1) % 100 == 0:
+            recent_loss = np.mean(losses[-100:])
+            recent_acc = np.mean(accuracies[-100:])
+            elapsed = time.perf_counter() - t0
+            print(f"  [{model_name}] Step {step+1}/{n_steps}  "
+                  f"loss={recent_loss:.4f}  acc={recent_acc:.3f}  ({elapsed:.1f}s)")
+
+    total_time = time.perf_counter() - t0
+    print(f"  [{model_name}] Training complete in {total_time:.1f}s")
+    return losses, accuracies, total_time
+
+
+def run_phase_3b(tokenizer, documents, n_steps=2000):
     print("\n" + "=" * 70)
     print("PHASE 3B: Quality vs Sequence Length — The Money Chart")
+    print("  Train at each length, then evaluate at that length.")
     print("=" * 70)
 
-    SEQ_LENGTHS = [128, 256, 512, 1024, 2048]
+    # Create training pairs from same-article chunks
+    doc_pairs = make_article_pairs(documents, min_len=128)
+    print(f"  Created {len(doc_pairs)} same-article training pairs")
 
-    # Train both models on NLI data at moderate length
-    models = {}
-    for name, build_encoder, WrapperClass in [
-        ("PRISM-Simplified", lambda: build_simplified_prism(), PRISMForEmbedding),
-        ("Transformer", lambda: build_transformer(), TransformerForEmbedding),
-    ]:
-        torch.manual_seed(42)
-        random.seed(42)
+    if len(doc_pairs) < 100:
+        print("  ERROR: too few training pairs, skipping 3B")
+        return None
 
-        encoder = build_encoder().to(DEVICE)
-        wrapper = WrapperClass(encoder, temperature=0.05).to(DEVICE)
+    SEQ_LENGTHS = [128, 256, 512]
 
-        train_contrastive(wrapper, train_pairs, n_steps, name, max_len=128)
-        models[name] = wrapper
-
-    # Evaluate at each sequence length
-    length_results = {name: {} for name in models}
+    length_results = {}
 
     for seq_len in SEQ_LENGTHS:
-        print(f"\n  --- Evaluating at seq_len={seq_len} ---")
-        for name, wrapper in models.items():
-            # Retrieval quality
-            ret = evaluate_retrieval_at_length(wrapper, documents, seq_len)
-            if ret is not None:
-                length_results[name][seq_len] = ret
-                print(f"    {name}: MRR={ret['mrr']:.4f}  R@1={ret['recall@1']:.4f}  "
-                      f"({ret['n_queries']} queries, {ret['corpus_size']} corpus)")
-            else:
-                print(f"    {name}: skipped (insufficient data at this length)")
+        print(f"\n{'='*60}")
+        print(f"  Training + Eval at seq_len={seq_len}")
+        print(f"{'='*60}")
 
-            # Throughput
+        # Filter pairs long enough for this seq_len
+        valid_pairs = [(a[:seq_len], b[:seq_len]) for a, b in doc_pairs
+                       if len(a) >= seq_len and len(b) >= seq_len]
+        print(f"  {len(valid_pairs)} pairs with both chunks >= {seq_len} tokens")
+
+        if len(valid_pairs) < 100:
+            print(f"  Skipping: too few pairs at this length")
+            continue
+
+        length_results[seq_len] = {}
+
+        for name, build_encoder, WrapperClass in [
+            ("PRISM-Simplified", lambda: build_simplified_prism(), PRISMForEmbedding),
+            ("Transformer", lambda: build_transformer(), TransformerForEmbedding),
+        ]:
+            torch.manual_seed(42)
+            random.seed(42)
+
+            encoder = build_encoder().to(DEVICE)
+            wrapper = WrapperClass(encoder, temperature=0.05).to(DEVICE)
+            n_params = sum(p.numel() for p in wrapper.parameters())
+
             try:
-                tp = measure_throughput(wrapper, seq_len)
-                if seq_len in length_results[name]:
-                    length_results[name][seq_len].update(tp)
-                else:
-                    length_results[name][seq_len] = tp
-            except RuntimeError as e:
-                print(f"    {name}: throughput measurement failed at {seq_len}: {e}")
+                losses, accs, train_time = train_contrastive_long(
+                    wrapper, valid_pairs, n_steps, f"{name}@{seq_len}",
+                    max_len=seq_len
+                )
 
-    # Plot the money chart
-    _plot_money_chart(length_results, SEQ_LENGTHS)
+                # Evaluate retrieval at this length
+                ret = evaluate_retrieval_at_length(wrapper, documents, seq_len)
+                tp = measure_throughput(wrapper, seq_len)
+
+                result = {
+                    "train_time": train_time,
+                    "final_loss": float(np.mean(losses[-100:])),
+                    "params": n_params,
+                }
+                if ret is not None:
+                    result.update(ret)
+                result.update(tp)
+                length_results[seq_len][name] = result
+
+                mrr_str = f"MRR={ret['mrr']:.4f}" if ret else "MRR=N/A"
+                print(f"  {name}: {mrr_str}  loss={result['final_loss']:.4f}  "
+                      f"{tp['throughput_seq_per_sec']:.1f} seq/s  time={train_time:.1f}s")
+
+            except RuntimeError as e:
+                print(f"  {name}: FAILED at seq_len={seq_len} ({e})")
+                length_results[seq_len][name] = {"failed": True, "error": str(e)}
+
+    # Plot
+    _plot_money_chart_v2(length_results)
 
     return length_results
 
 
-def _plot_money_chart(length_results, seq_lengths):
-    """Plot quality and throughput vs sequence length."""
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-    fig.suptitle("Real Data: Quality and Throughput vs Sequence Length",
-                 fontsize=14, fontweight="bold")
-
+def _plot_money_chart_v2(length_results):
+    """Plot quality and throughput vs sequence length (train-at-length version)."""
     colors = {"PRISM-Simplified": "#2563EB", "Transformer": "#DC2626"}
+
+    # Reorganize: {model_name: {seq_len: metrics}}
+    model_results = {}
+    for seq_len, by_model in length_results.items():
+        for name, metrics in by_model.items():
+            if isinstance(metrics, dict) and not metrics.get("failed"):
+                model_results.setdefault(name, {})[seq_len] = metrics
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    fig.suptitle("Real Data: Train + Eval at Each Length (CNN/DailyMail)",
+                 fontsize=14, fontweight="bold")
 
     # MRR vs length
     ax = axes[0]
-    for name, results_by_len in length_results.items():
-        lens = sorted([l for l in results_by_len if "mrr" in results_by_len[l]])
-        mrrs = [results_by_len[l]["mrr"] for l in lens]
+    for name, by_len in model_results.items():
+        lens = sorted([l for l in by_len if "mrr" in by_len[l]])
+        mrrs = [by_len[l]["mrr"] for l in lens]
         if lens:
-            ax.plot(lens, mrrs, "o-", color=colors[name], linewidth=2,
-                    markersize=6, label=name)
-    ax.set_xlabel("Sequence Length")
+            ax.plot(lens, mrrs, "o-", color=colors.get(name, "#666"), linewidth=2,
+                    markersize=8, label=name)
+            for l, m in zip(lens, mrrs):
+                ax.annotate(f"{m:.3f}", (l, m), textcoords="offset points",
+                           xytext=(0, 8), ha="center", fontsize=8)
+    ax.set_xlabel("Sequence Length (tokens)")
     ax.set_ylabel("MRR")
-    ax.set_title("Retrieval Quality (MRR)")
+    ax.set_title("Retrieval Quality")
     ax.set_xscale("log", base=2)
     ax.legend()
     ax.grid(True, alpha=0.3)
 
     # Throughput vs length
     ax = axes[1]
-    for name, results_by_len in length_results.items():
-        lens = sorted([l for l in results_by_len if "throughput_seq_per_sec" in results_by_len[l]])
-        tps = [results_by_len[l]["throughput_seq_per_sec"] for l in lens]
+    for name, by_len in model_results.items():
+        lens = sorted([l for l in by_len if "throughput_seq_per_sec" in by_len[l]])
+        tps = [by_len[l]["throughput_seq_per_sec"] for l in lens]
         if lens:
-            ax.plot(lens, tps, "o-", color=colors[name], linewidth=2,
-                    markersize=6, label=name)
-    ax.set_xlabel("Sequence Length")
+            ax.plot(lens, tps, "o-", color=colors.get(name, "#666"), linewidth=2,
+                    markersize=8, label=name)
+    ax.set_xlabel("Sequence Length (tokens)")
     ax.set_ylabel("Sequences/sec")
     ax.set_title("Encoding Throughput")
     ax.set_xscale("log", base=2)
@@ -579,19 +684,17 @@ def _plot_money_chart(length_results, seq_lengths):
     ax.legend()
     ax.grid(True, alpha=0.3)
 
-    # Quality-per-FLOP: MRR / latency
+    # Training time vs length
     ax = axes[2]
-    for name, results_by_len in length_results.items():
-        lens = sorted([l for l in results_by_len
-                       if "mrr" in results_by_len[l] and "latency_ms" in results_by_len[l]])
-        efficiency = [results_by_len[l]["mrr"] / results_by_len[l]["latency_ms"] * 1000
-                      for l in lens]
+    for name, by_len in model_results.items():
+        lens = sorted([l for l in by_len if "train_time" in by_len[l]])
+        times = [by_len[l]["train_time"] for l in lens]
         if lens:
-            ax.plot(lens, efficiency, "o-", color=colors[name], linewidth=2,
-                    markersize=6, label=name)
-    ax.set_xlabel("Sequence Length")
-    ax.set_ylabel("MRR per second")
-    ax.set_title("Quality-Efficiency Tradeoff")
+            ax.plot(lens, times, "o-", color=colors.get(name, "#666"), linewidth=2,
+                    markersize=8, label=name)
+    ax.set_xlabel("Sequence Length (tokens)")
+    ax.set_ylabel("Training Time (s)")
+    ax.set_title("Training Cost (2000 steps)")
     ax.set_xscale("log", base=2)
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -659,12 +762,12 @@ if __name__ == "__main__":
     # Phase 3A: STS-B quality
     results_3a = run_phase_3a(tokenizer, train_pairs, sts_examples, n_steps=2000)
 
-    # Phase 3B: Length-controlled retrieval
-    print("\n  Loading long documents for length-controlled eval...")
-    documents = load_long_documents(tokenizer, n_docs=5000, min_len=256)
+    # Phase 3B: Length-controlled retrieval (train at each length)
+    print("\n  Loading long documents for length-controlled training + eval...")
+    documents = load_long_documents(tokenizer, n_docs=10000, min_len=128)
     results_3b = None
     if len(documents) >= 200:
-        results_3b = run_phase_3b(tokenizer, train_pairs, documents, n_steps=2000)
+        results_3b = run_phase_3b(tokenizer, documents, n_steps=2000)
     else:
         print("  Skipping Phase 3B: insufficient long documents")
 

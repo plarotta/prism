@@ -1,0 +1,186 @@
+{
+  "phase_3a": {
+    "PRISM-Simplified": {
+      "sts_spearman": 0.5893055695678127,
+      "train_time": 371.3115284859996,
+      "params": 21552384,
+      "final_loss": 0.44001871332526205
+    },
+    "Transformer": {
+      "sts_spearman": 0.5593122584395479,
+      "train_time": 118.19318802999987,
+      "params": 22119936,
+      "final_loss": 0.6943628486990928
+    }
+  },
+  "phase_3b": {
+    "PRISM-Simplified": {
+      "128": {
+        "mrr": 0.4922318219536968,
+        "recall@1": 0.48,
+        "recall@5": 0.505,
+        "recall@10": 0.505,
+        "n_queries": 200,
+        "corpus_size": 2000,
+        "seq_len": 128,
+        "throughput_seq_per_sec": 885.1149162391753,
+        "latency_ms": 36.15349760002573
+      },
+      "256": {
+        "mrr": 0.49661087450295477,
+        "recall@1": 0.47,
+        "recall@5": 0.525,
+        "recall@10": 0.535,
+        "n_queries": 200,
+        "corpus_size": 2000,
+        "seq_len": 256,
+        "throughput_seq_per_sec": 720.8271539353501,
+        "latency_ms": 44.39344414995503
+      },
+      "512": {
+        "mrr": 0.5234584995006668,
+        "recall@1": 0.48,
+        "recall@5": 0.565,
+        "recall@10": 0.58,
+        "n_queries": 200,
+        "corpus_size": 2000,
+        "seq_len": 512,
+        "throughput_seq_per_sec": 510.02819996850627,
+        "latency_ms": 62.74162880008589
+      },
+      "1024": {
+        "mrr": 0.5674989374814059,
+        "recall@1": 0.45,
+        "recall@5": 0.7,
+        "recall@10": 0.75,
+        "n_queries": 20,
+        "corpus_size": 539,
+        "seq_len": 1024,
+        "throughput_seq_per_sec": 217.63885079832758,
+        "latency_ms": 147.03257199998916
+      },
+      "2048": {
+        "throughput_seq_per_sec": 106.16128102263086,
+        "latency_ms": 301.4281637500062
+      }
+    },
+    "Transformer": {
+      "128": {
+        "mrr": 0.5000414886070554,
+        "recall@1": 0.475,
+        "recall@5": 0.515,
+        "recall@10": 0.54,
+        "n_queries": 200,
+        "corpus_size": 2000,
+        "seq_len": 128,
+        "throughput_seq_per_sec": 4492.010058232492,
+        "latency_ms": 7.123759649948624
+      },
+      "256": {
+        "mrr": 0.5082036105385361,
+        "recall@1": 0.48,
+        "recall@5": 0.54,
+        "recall@10": 0.56,
+        "n_queries": 200,
+        "corpus_size": 2000,
+        "seq_len": 256,
+        "throughput_seq_per_sec": 2125.139828396926,
+        "latency_ms": 15.057832699949358
+      },
+      "512": {
+        "mrr": 0.5299674775801002,
+        "recall@1": 0.48,
+        "recall@5": 0.575,
+        "recall@10": 0.61,
+        "n_queries": 200,
+        "corpus_size": 2000,
+        "seq_len": 512,
+        "throughput_seq_per_sec": 890.8584420370358,
+        "latency_ms": 35.920409450045554
+      },
+      "1024": {
+        "mrr": 0.6175366300366301,
+        "recall@1": 0.45,
+        "recall@5": 0.8,
+        "recall@10": 0.9,
+        "n_queries": 20,
+        "corpus_size": 539,
+        "seq_len": 1024,
+        "throughput_seq_per_sec": 326.0287209704906,
+        "latency_ms": 98.15086199996585
+      },
+      "2048": {
+        "throughput_seq_per_sec": 73.44448122140005,
+        "latency_ms": 435.7032614000673
+      }
+    }
+  },
+  "phase_3c": {
+    "PRISM-Simplified": {
+      "64": {
+        "throughput_seq_per_sec": 1054.5265492805588,
+        "latency_ms": 30.345371600014914
+      },
+      "128": {
+        "throughput_seq_per_sec": 1016.5131706904434,
+        "latency_ms": 31.480162699972425
+      },
+      "256": {
+        "throughput_seq_per_sec": 783.1603951208629,
+        "latency_ms": 40.86008459998993
+      },
+      "512": {
+        "throughput_seq_per_sec": 508.6296033679593,
+        "latency_ms": 62.91415165005673
+      },
+      "1024": {
+        "throughput_seq_per_sec": 217.88040404030636,
+        "latency_ms": 146.86956424993696
+      },
+      "2048": {
+        "throughput_seq_per_sec": 106.5615997709362,
+        "latency_ms": 300.29579199999716
+      },
+      "4096": {
+        "throughput_seq_per_sec": 51.69447879758352,
+        "latency_ms": 619.0216198000599
+      },
+      "8192": {
+        "throughput_seq_per_sec": 24.959796026099095,
+        "latency_ms": 1282.0617591000882
+      }
+    },
+    "Transformer": {
+      "64": {
+        "throughput_seq_per_sec": 8839.731510394022,
+        "latency_ms": 3.6200194499542704
+      },
+      "128": {
+        "throughput_seq_per_sec": 4487.102203305638,
+        "latency_ms": 7.131551400016178
+      },
+      "256": {
+        "throughput_seq_per_sec": 2128.4411680646444,
+        "latency_ms": 15.034477100016375
+      },
+      "512": {
+        "throughput_seq_per_sec": 887.9523051611311,
+        "latency_ms": 36.03797165005744
+      },
+      "1024": {
+        "throughput_seq_per_sec": 326.0564047929159,
+        "latency_ms": 98.1425285000114
+      },
+      "2048": {
+        "throughput_seq_per_sec": 73.63354729835191,
+        "latency_ms": 434.5845226000165
+      }
+    }
+  },
+  "config": {
+    "device": "cuda",
+    "tokenizer": "bert-base-uncased",
+    "vocab_size": 30522,
+    "batch_size": 32
+  }
+}

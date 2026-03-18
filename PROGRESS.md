@@ -100,37 +100,78 @@ Additional observations from the training curves:
 
 ---
 
-## Phase 3: Real Data Evaluation (next)
+## Phase 3 Results: Real Data
 
-### 3A — Real language, real tokenizer
+### 3A — STS-Benchmark: PRISM wins (+3 Spearman)
 
-Train simplified PRISM and Transformer on NLI entailment pairs (SNLI + MNLI)
-using `bert-base-uncased` tokenizer (30,522 vocab). Evaluate STS-Benchmark
-(Spearman correlation). Proves the architecture works on real language.
+Trained on NLI entailment pairs (SNLI + MNLI), `bert-base-uncased` tokenizer,
+2000 steps, max_len=128.
 
-### 3B — Quality vs sequence length (the money chart)
+| Model            | STS-B Spearman | Final Loss | Train Time |
+|------------------|---------------|------------|------------|
+| PRISM-Simplified | **0.589**     | 0.440      | 371s       |
+| Transformer      | 0.559         | 0.694      | 118s       |
 
-Evaluate retrieval quality at controlled lengths (128, 256, 512, 1024, 2048) on
-Wikipedia paragraph matching. Plot MRR and throughput vs length. Show the crossover.
+PRISM learns better representations on real language (+3 Spearman points) despite
+being 3x slower per step at this length. PRISM's loss is also significantly lower
+(0.44 vs 0.69), suggesting the recurrence captures NLI structure more effectively.
 
-### 3C — Standard benchmarks (conditional)
+### 3B — Length-controlled retrieval: v1 FLAWED, v2 pending
 
-If 3A+3B are positive: MTEB subset (STS + Retrieval + Classification).
+**v1 (flawed):** Trained at max_len=128, evaluated at 128-2048. Models had never
+seen long sequences, so the eval was testing OOD generalization, not long-sequence
+quality. Both models showed ~0.5 MRR across all lengths. Not informative.
 
-### Success Criteria
+**v2 (ready to run):** Train fresh models at each target length (128, 256, 512) on
+CNN/DailyMail same-article pairs. This matches the Phase 2 synthetic setup that
+showed the 9.5-point PRISM advantage at longer sequences.
 
-| Test                      | Pass Condition                                    |
-|---------------------------|---------------------------------------------------|
-| STS-B Spearman            | PRISM within 3 points of Transformer              |
-| Retrieval at 128 tokens   | Transformer >= PRISM (expected)                   |
-| Retrieval at 512+ tokens  | PRISM >= Transformer                              |
-| Retrieval at 2048 tokens  | PRISM > Transformer AND 2x+ throughput            |
+### 3C — Throughput scaling: confirmed on real vocab
 
-### To Run
+| Seq Len | PRISM (seq/s) | Transformer (seq/s) | Speedup |
+|---------|--------------|--------------------|---------|
+| 64      | 1,055        | 8,840              | 0.12x   |
+| 128     | 1,017        | 4,487              | 0.23x   |
+| 256     | 783          | 2,128              | 0.37x   |
+| 512     | 509          | 888                | 0.57x   |
+| 1024    | 218          | 326                | 0.67x   |
+| 2048    | 107          | 74                 | **1.45x** |
+| 4096    | 52           | OOM                | **inf** |
+| 8192    | 25           | OOM                | **inf** |
+
+Crossover at ~2048 with batch=32 on a 44 GB GPU. Transformer OOMs at 4096.
+
+---
+
+## Phase 4: V2 Fixes — Reviving Interference & Covariance (next)
+
+Code-level review (PRISM_v2fixes.txt) identified specific numerical issues that explain
+why the "novel" components failed. Not theoretical problems — implementation scaling bugs
+analogous to missing 1/sqrt(d_k) in attention.
+
+### Interference Fixes (CrossScaleInterferenceV2)
+
+1. Per-channel LayerNorm before bilinear product (channels have wildly different magnitudes)
+2. 1/sqrt(d_c) scaling on bilinear product (variance control)
+3. Alpha initialized to 1/(C-1) instead of zero (break out of gradient desert)
+4. Learned gate: mixed = H + sigmoid(gamma) * interference (amplify once learned)
+
+### Covariance Pooling Fixes (AttentiveCovariancePoolingV2)
+
+1. LayerNorm on covariance vector before concatenation
+2. Reduced cov_rank: 8 instead of 32 (64 dims not 1024 — stop drowning semantic stream)
+3. Project covariance to d dimensions (both streams contribute equally)
+
+### Ablation Plan (7 variants A-G)
+
+Each variant isolates one fix. Variant G combines all. Tested at seq_q=256, seq_p=512,
+2000 steps. Success = Variant G matches or beats the simplified mean-pool baseline.
+
+### To Run (everything)
 
 ```bash
 uv add datasets transformers scipy
-uv run python benchmark_real_data.py
+uv run python run_all_v2.py
 ```
 
 ---
@@ -139,15 +180,18 @@ uv run python benchmark_real_data.py
 
 ```
 prism/
-├── prism.py                    # Core PRISM architecture
+├── prism.py                    # Core architecture (+ V2 classes)
 ├── baseline_transformer.py     # Transformer baseline (parameter-matched)
 ├── benchmark_scaling.py        # Throughput / memory / latency vs seq length
 ├── benchmark_quality.py        # Synthetic contrastive training + retrieval eval
-├── benchmark_ablations.py      # Component ablation study (4 variants)
-├── benchmark_real_data.py      # Phase 3: real-data evaluation
-├── investigate.py              # Phase 2: alpha autopsy + warm init + long-seq showdown
-├── run_all.py                  # Master runner for Phase 1
+├── benchmark_ablations.py      # Original component ablation study (A-D)
+├── benchmark_v2_ablations.py   # V2 targeted fixes ablation (A-G)
+├── benchmark_real_data.py      # Real-data evaluation (NLI, STS-B, long-doc)
+├── investigate.py              # Phase 2: alpha autopsy + warm init + long-seq
+├── run_all.py                  # Phase 1 runner (scaling + quality + ablations)
+├── run_all_v2.py               # Master runner (everything: scaling → real data)
 ├── PRISM_Technical_Report.txt  # Original architecture design
+├── PRISM_v2fixes.txt           # Analysis of why novel components failed + fixes
 ├── PRISM_Experiment_Plan.md    # Original 16-week plan
 ├── PROGRESS.md                 # This file
 ├── pyproject.toml              # uv project config

@@ -316,6 +316,67 @@ class CrossScaleInterference(nn.Module):
         return [mixed[c] for c in range(C)]
 
 
+class CrossScaleInterferenceV2(nn.Module):
+    """V2 cross-channel interaction with four targeted fixes:
+
+    1. Per-channel LayerNorm before bilinear product (normalizes across decay scales)
+    2. 1/sqrt(d_c) scaling on bilinear product (analogous to attention scaling)
+    3. Alpha initialized to 1/(C-1) instead of zero (information flows from step one)
+    4. Learned gate on interference path: mixed = H + sigmoid(gamma) * interference
+    """
+
+    def __init__(self, d_c: int, n_channels: int):
+        super().__init__()
+        self.d_c = d_c
+        self.n_channels = n_channels
+        C = n_channels
+
+        # Fix 1: per-channel normalization
+        self.channel_norms = nn.ModuleList([nn.LayerNorm(d_c) for _ in range(C)])
+
+        # Bilinear projections
+        self.U = nn.Parameter(torch.zeros(C, d_c, d_c))
+        self.V = nn.Parameter(torch.zeros(C, d_c, d_c))
+        nn.init.normal_(self.U, std=0.02)
+        nn.init.normal_(self.V, std=0.02)
+
+        # Fix 3: alpha initialized to 1/(C-1)
+        alpha_init = torch.full((C, C), 1.0 / max(C - 1, 1))
+        alpha_init.fill_diagonal_(0.0)
+        self.alpha = nn.Parameter(alpha_init)
+
+        # Fix 2: scaling factor
+        self.scale = 1.0 / math.sqrt(d_c)
+
+        # Fix 4: learned gate (sigmoid(-3) ≈ 0.05, near zero at init)
+        self.gamma = nn.Parameter(torch.full((C, 1, 1, 1), -3.0))
+
+    def forward(self, hiddens: list[Tensor]) -> list[Tensor]:
+        C = self.n_channels
+        H_orig = torch.stack(hiddens, dim=0)  # (C, B, T, d_c)
+
+        # Fix 1: normalize per channel before bilinear
+        H_normed = torch.stack(
+            [self.channel_norms[c](hiddens[c]) for c in range(C)], dim=0
+        )
+
+        UH = torch.einsum("cbti, cij -> cbtj", H_normed, self.U)
+        VH = torch.einsum("cbti, cij -> cbtj", H_normed, self.V)
+
+        alpha_masked = self.alpha.clone()
+        alpha_masked.fill_diagonal_(0.0)
+
+        weighted_VH = torch.einsum("ij, jbtd -> ibtd", alpha_masked, VH)
+
+        # Fix 2: scale bilinear product
+        interference = UH * weighted_VH * self.scale
+
+        # Fix 4: gated residual
+        mixed = H_orig + torch.sigmoid(self.gamma) * interference
+
+        return [mixed[c] for c in range(C)]
+
+
 # ---------------------------------------------------------------------------
 # Stage 4: Bidirectional Gated Fusion
 # ---------------------------------------------------------------------------
@@ -429,6 +490,80 @@ class AttentiveCovariancePooling(nn.Module):
         combined = torch.cat([e_1, e_2], dim=-1)  # (B, d + r²)
         embedding = self.layer_norm(self.out_proj(combined))  # (B, d_e)
 
+        return embedding
+
+
+class AttentiveCovariancePoolingV2(nn.Module):
+    """V2 pooling with three targeted fixes:
+
+    1. LayerNorm on covariance vector before concatenation (scale normalization)
+    2. Reduced cov_rank (default 8 instead of 32, yielding 64 dims not 1024)
+    3. Project covariance to d dimensions so both streams contribute equally
+    """
+
+    def __init__(self, d: int, d_e: int, cov_rank: int = 8):
+        super().__init__()
+        self.d = d
+        self.d_e = d_e
+        self.cov_rank = cov_rank
+
+        # Stream 1: attentive pooling
+        self.W_q = nn.Linear(d, d, bias=False)
+
+        # Stream 2: covariance sketch (reduced rank)
+        self.P = nn.Linear(d, cov_rank, bias=False)
+        self.Q = nn.Linear(d, cov_rank, bias=False)
+
+        # Fix 1: normalize covariance before use
+        self.cov_norm = nn.LayerNorm(cov_rank * cov_rank)
+
+        # Fix 3: project covariance to d dims (eliminates dimensionality imbalance)
+        self.cov_proj = nn.Linear(cov_rank * cov_rank, d)
+
+        # Both streams now contribute d dimensions
+        self.out_proj = nn.Linear(2 * d, d_e)
+        self.layer_norm = nn.LayerNorm(d_e)
+
+    def forward(
+        self,
+        f: Tensor,
+        query_state: Tensor,
+        mask: Optional[Tensor] = None,
+    ) -> Tensor:
+        B, T, D = f.shape
+
+        # --- Stream 1: attentive pooling ---
+        query = self.W_q(query_state)
+        scores = torch.einsum("bd, btd -> bt", query, f) / math.sqrt(D)
+        if mask is not None:
+            scores = scores.masked_fill(~mask, float("-inf"))
+        attn = F.softmax(scores, dim=-1)
+        e_1 = torch.einsum("bt, btd -> bd", attn, f)  # (B, d)
+
+        # --- Stream 2: covariance sketch ---
+        Pf = self.P(f)
+        Qf = self.Q(f)
+        if mask is not None:
+            Pf = Pf * mask.unsqueeze(-1).float()
+            Qf = Qf * mask.unsqueeze(-1).float()
+            n_valid = mask.sum(dim=1, keepdim=True).float().clamp(min=1.0)
+        else:
+            n_valid = torch.tensor(T, dtype=f.dtype, device=f.device)
+
+        cov = torch.einsum("btr, bts -> brs", Pf, Qf)
+        if mask is not None:
+            cov = cov / n_valid.unsqueeze(-1)
+        else:
+            cov = cov / T
+
+        e_2 = cov.reshape(B, -1)
+
+        # Fix 1+3: normalize then project to d dimensions
+        e_2 = self.cov_proj(self.cov_norm(e_2))  # (B, d)
+
+        # --- Combine ---
+        combined = torch.cat([e_1, e_2], dim=-1)  # (B, 2*d)
+        embedding = self.layer_norm(self.out_proj(combined))
         return embedding
 
 
