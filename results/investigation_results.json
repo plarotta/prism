@@ -1,0 +1,30 @@
+{
+  "PRISM-MeanPool": {
+    "metrics": {
+      "mrr": 0.9849190476190476,
+      "recall@1": 0.976,
+      "recall@5": 0.998,
+      "recall@10": 1.0,
+      "topic_accuracy": 0.9760000109672546,
+      "mean_rank": 1.054,
+      "median_rank": 1.0
+    },
+    "train_time": 713.9504042118788,
+    "params": 10815408,
+    "final_loss": 0.020207570232450962
+  },
+  "Transformer": {
+    "metrics": {
+      "mrr": 0.8904106485018248,
+      "recall@1": 0.832,
+      "recall@5": 0.966,
+      "recall@10": 0.992,
+      "topic_accuracy": 0.8560000061988831,
+      "mean_rank": 1.48,
+      "median_rank": 1.0
+    },
+    "train_time": 282.96983506530523,
+    "params": 10792704,
+    "final_loss": 0.03374872506712563
+  }
+}

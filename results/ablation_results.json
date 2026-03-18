@@ -1,0 +1,77 @@
+{
+  "Full PRISM": {
+    "metrics": {
+      "mrr": 0.9504833333333333,
+      "recall@1": 0.922,
+      "recall@5": 0.992,
+      "recall@10": 0.998,
+      "topic_accuracy": 0.9240000247955322,
+      "mean_rank": 1.188,
+      "median_rank": 1.0
+    },
+    "train_time": 103.88382828235626,
+    "params": 11202480,
+    "final_loss": 0.17287777446210384,
+    "final_acc": 0.969375
+  },
+  "A: No Interference": {
+    "metrics": {
+      "mrr": 0.9411980127269969,
+      "recall@1": 0.918,
+      "recall@5": 0.97,
+      "recall@10": 0.976,
+      "topic_accuracy": 0.9179999828338623,
+      "mean_rank": 2.332,
+      "median_rank": 1.0
+    },
+    "train_time": 84.80996938049793,
+    "params": 10612224,
+    "final_loss": 0.1675657583773136,
+    "final_acc": 0.9675
+  },
+  "B: Learned Decay": {
+    "metrics": {
+      "mrr": 0.950073830973831,
+      "recall@1": 0.93,
+      "recall@5": 0.972,
+      "recall@10": 0.982,
+      "topic_accuracy": 0.9300000071525574,
+      "mean_rank": 1.728,
+      "median_rank": 1.0
+    },
+    "train_time": 99.29956701397896,
+    "params": 11202516,
+    "final_loss": 0.18130747303366662,
+    "final_acc": 0.968125
+  },
+  "C: Additive (not bilinear)": {
+    "metrics": {
+      "mrr": 0.9481567843920785,
+      "recall@1": 0.924,
+      "recall@5": 0.978,
+      "recall@10": 0.988,
+      "topic_accuracy": 0.9240000247955322,
+      "mean_rank": 1.478,
+      "median_rank": 1.0
+    },
+    "train_time": 93.77262706309557,
+    "params": 11202480,
+    "final_loss": 0.1632047799229622,
+    "final_acc": 0.97
+  },
+  "D: Mean Pooling": {
+    "metrics": {
+      "mrr": 0.9843833333333333,
+      "recall@1": 0.972,
+      "recall@5": 0.996,
+      "recall@10": 0.998,
+      "topic_accuracy": 0.972000002861023,
+      "mean_rank": 1.066,
+      "median_rank": 1.0
+    },
+    "train_time": 99.14896304905415,
+    "params": 10815408,
+    "final_loss": 0.056575278602540496,
+    "final_acc": 0.99625
+  }
+}
