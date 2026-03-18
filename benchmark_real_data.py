@@ -145,25 +145,51 @@ def load_sts_benchmark(tokenizer, max_len=128):
 
 
 def load_long_documents(tokenizer, n_docs=5000, min_len=256):
-    """Load Wikipedia paragraphs for long-document retrieval evaluation.
+    """Load long documents for retrieval evaluation.
 
+    Tries Wikipedia first, falls back to CNN/DailyMail articles.
     Returns list of (doc_ids, article_id) where article_id groups related docs.
     """
-    print("Loading Wikipedia paragraphs for long-document eval...")
-    ds = load_dataset("wikipedia", "20220301.en", split="train", streaming=True,
-                      trust_remote_code=True)
+    # Try Wikipedia (new HF path)
+    for wiki_path in ["wikimedia/wikipedia", "wikipedia"]:
+        try:
+            print(f"Loading Wikipedia paragraphs ({wiki_path})...")
+            ds = load_dataset(wiki_path, "20220301.en", split="train", streaming=True)
+            documents = []
+            article_id = 0
+            for article in ds:
+                text = article["text"]
+                paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 100]
+                for para in paragraphs:
+                    tokens = tokenizer.encode(para, max_length=2048, truncation=True,
+                                               add_special_tokens=False)
+                    if len(tokens) >= min_len:
+                        documents.append((tokens, article_id))
+                article_id += 1
+                if len(documents) >= n_docs:
+                    break
+            if documents:
+                print(f"  Loaded {len(documents)} paragraphs from {article_id} articles")
+                return documents
+        except Exception as e:
+            print(f"  Wikipedia ({wiki_path}) failed: {e}")
 
+    # Fallback: CNN/DailyMail (articles are 300-800 tokens naturally)
+    print("Falling back to CNN/DailyMail...")
+    ds = load_dataset("cnn_dailymail", "3.0.0", split="train", streaming=True)
     documents = []
     article_id = 0
     for article in ds:
-        text = article["text"]
-        # Split into paragraphs
-        paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 100]
-        for para in paragraphs:
-            tokens = tokenizer.encode(para, max_length=2048, truncation=True,
-                                       add_special_tokens=False)
-            if len(tokens) >= min_len:
-                documents.append((tokens, article_id))
+        text = article["article"]
+        tokens = tokenizer.encode(text, max_length=2048, truncation=True,
+                                   add_special_tokens=False)
+        if len(tokens) >= min_len:
+            documents.append((tokens, article_id))
+        # Also split long articles into chunks to get same-article pairs
+        if len(tokens) >= min_len * 2:
+            mid = len(tokens) // 2
+            documents.append((tokens[:mid], article_id))
+            documents.append((tokens[mid:], article_id))
         article_id += 1
         if len(documents) >= n_docs:
             break

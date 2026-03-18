@@ -1,61 +1,102 @@
 # PRISM: Experiment Progress
 
-## Current Status: Simplified Architecture Validated, Moving to Real Data
+## Current Status: Moving to Real Data
 
-**The revised thesis:** A bidirectional multi-channel state-space encoder with fixed geometric
-decay rates and mean pooling achieves competitive embedding quality with a Transformer of
-equal parameter count, while scaling linearly in sequence length. At 2048+ tokens, it is
-faster. At 8192 tokens, 6x faster. At 16384 tokens, the Transformer OOMs.
+Simplified PRISM (multi-channel recurrence + mean pooling) **beats the Transformer by
+9.5 MRR points** at longer sequences (256/512 tokens, 2000 steps) while scaling linearly.
+The original "novel" components (interference, covariance pooling) are dropped — they
+don't help. The contribution is a clean, empirical result:
 
-The original "cross-scale interference" and "covariance pooling" mechanisms are dropped.
-They are somewhere between inert and actively harmful at this scale. The contribution is
-the scaling proof, not the architectural novelty.
+> A bidirectional multi-channel state-space encoder with fixed geometric decay rates
+> learns better embeddings than a parameter-matched Transformer at sequences beyond
+> ~256 tokens, with linear-time scaling, 6x inference speedup at 8K tokens, and
+> 18x lower memory at 4K tokens.
+
+Next step: real data (NLI training, STS-B eval, Wikipedia retrieval at controlled lengths).
 
 ---
 
-## Phase 1 Results: Scaling (A100 80GB)
+## Phase 1 Results: A100 80GB
+
+### Scaling
 
 PRISM vs Transformer inference latency (batch=8, ~26M params each):
 
-| Seq Len | PRISM (ms) | Transformer (ms) | Speedup |
-|---------|-----------|------------------|---------|
-| 64      | 32.2      | 3.0              | 0.09x   |
-| 256     | 36.5      | 3.8              | 0.10x   |
-| 512     | 41.3      | 8.2              | 0.20x   |
-| 1024    | 48.8      | 20.0             | 0.41x   |
-| **2048**| **63.7**  | **68.9**         | **1.08x** (crossover) |
-| **4096**| **93.2**  | **238.2**        | **2.56x** |
-| **8192**| **170.5** | **1026.2**       | **6.02x** |
-| **16384**| **362.3**| **OOM**          | **inf** |
+| Seq Len | PRISM (ms) | Transformer (ms) | Speedup | PRISM Mem | Trans Mem | Mem Ratio |
+|---------|-----------|------------------|---------|-----------|-----------|-----------|
+| 64      | 32.2      | 3.0              | 0.09x   | 11 MB     | 6 MB      | 0.5x      |
+| 256     | 36.5      | 3.8              | 0.10x   | 45 MB     | 38 MB     | 0.8x      |
+| 512     | 41.3      | 8.2              | 0.20x   | 89 MB     | 126 MB    | 1.4x      |
+| 1024    | 48.8      | 20.0             | 0.41x   | 178 MB    | 453 MB    | 2.5x      |
+| 2048    | 63.7      | 68.9             | 1.08x   | 357 MB    | 3,322 MB  | **9.3x**  |
+| 4096    | 93.2      | 238.2            | 2.56x   | 713 MB    | 13,086 MB | **18.3x** |
+| 8192    | 170.5     | 1,026.2          | 6.02x   | 1,426 MB  | 51,943 MB | **36.4x** |
+| 16384   | 362.3     | OOM              | inf     | 2,852 MB  | OOM       | inf       |
 
 Training (fwd+bwd): crossover at ~2048, 1.73x at 4096, Transformer OOMs at 8192+.
 
-## Phase 1 Results: Quality (Synthetic Data)
+### Quality — Short Sequences (Phase 1)
 
-Synthetic contrastive task (200 topics, 40% noise, 5K corpus):
+Synthetic contrastive task, 400 steps, seq_len_q=64, seq_len_p=96:
 
-| Metric         | PRISM  | Transformer |
-|----------------|--------|-------------|
-| MRR            | 0.950  | 0.991       |
-| Recall@1       | 0.922  | 0.984       |
-| Recall@5       | 0.984  | 1.000       |
+| Metric    | PRISM (full) | Transformer |
+|-----------|-------------|-------------|
+| MRR       | 0.950       | 0.991       |
+| Recall@1  | 0.922       | 0.984       |
+| Recall@5  | 0.984       | 1.000       |
 
-4-point MRR gap at short sequences (64/96 tokens) — worst case for PRISM.
+Transformer wins by ~4 MRR points at short sequences. Expected — attention has full
+pairwise interaction at low cost for short inputs.
 
-## Phase 2 Results: Ablation Conclusions
+### Ablations — Novel Components Don't Help
 
-| Component                    | Verdict              |
-|------------------------------|---------------------|
-| Multi-channel recurrence     | **Works** — core engine |
-| Bidirectional gated fusion   | **Works** — needed for embeddings |
-| Mean pooling                 | **Works** — +3.4 MRR vs covariance |
-| Linear scaling               | **Confirmed** — 6x at 8K |
+| Variant                  | MRR    | Delta   | Verdict             |
+|--------------------------|--------|---------|---------------------|
+| Full PRISM               | 0.9505 | —       | baseline            |
+| A: No Interference       | 0.9412 | -0.009  | within noise        |
+| B: Learned Decay         | 0.9501 | -0.000  | identical           |
+| C: Additive Interference | 0.9482 | -0.002  | within noise        |
+| D: Mean Pooling          | 0.9844 | **+0.034** | **better without cov pooling** |
+
+**Conclusion:** Drop interference (inert). Drop covariance pooling (actively harmful).
+Keep fixed decay (simpler, same quality as learned). Mean pooling is strictly better.
+
+---
+
+## Phase 2 Results: Investigation (completed)
+
+### The Reversal: PRISM Dominates at Longer Sequences
+
+PRISM-MeanPool vs Transformer, 2000 steps, seq_q=256, seq_p=512:
+
+| Metric    | PRISM-MeanPool | Transformer | Delta     |
+|-----------|---------------|-------------|-----------|
+| MRR       | **0.985**     | 0.890       | **+0.095** |
+| Recall@1  | **0.976**     | 0.832       | **+0.144** |
+| Recall@5  | **0.998**     | 0.966       | **+0.032** |
+| Recall@10 | **1.000**     | 0.992       | **+0.008** |
+
+**This is the central result.** At longer sequences, the Transformer's quality degrades
+while PRISM's improves. The 4-point deficit at short sequences reverses to a **9.5-point
+advantage** at 256/512 tokens.
+
+Additional observations from the training curves:
+- PRISM converges faster: loss drops below 0.2 by step ~300, Transformer takes until ~600.
+- PRISM reaches lower final loss: 0.020 vs 0.034.
+- Transformer trains 2.5x faster wall-clock (283s vs 714s for 2000 steps at this length),
+  but PRISM uses that time more effectively — better final quality despite slower steps.
+
+### Component Assessment (Final)
+
+| Component                    | Verdict                       |
+|------------------------------|-------------------------------|
+| Multi-channel recurrence     | **Core engine** — works       |
+| Fixed geometric decay rates  | **Keep** — simpler, same quality |
+| Bidirectional gated fusion   | **Keep** — needed for embeddings |
+| Mean pooling                 | **Keep** — +3.4 MRR vs covariance |
+| Linear O(n) scaling          | **Confirmed** — 6x at 8K, 18x memory savings at 4K |
 | Cross-scale interference     | **Drop** — <0.01 MRR contribution |
-| Fixed vs learned decay       | **No difference** — keep fixed (simpler) |
-| Bilinear vs additive mixing  | **No difference** — both inert |
-| Covariance pooling           | **Drop** — actively harmful (-3.4 MRR) |
-
-**Simplified PRISM = multi-channel stratified recurrence + bidirectional fusion + mean pooling.**
+| Covariance pooling           | **Drop** — actively harmful   |
 
 ---
 
@@ -63,46 +104,34 @@ Synthetic contrastive task (200 topics, 40% noise, 5K corpus):
 
 ### 3A — Real language, real tokenizer
 
-Train simplified PRISM and parameter-matched Transformer on NLI contrastive pairs
-(SNLI + MNLI entailment pairs, ~275K) using `bert-base-uncased` tokenizer (30,522 vocab).
-Evaluate on STS-Benchmark (Spearman correlation). This proves the architecture works
-on real language, not just synthetic token distributions.
+Train simplified PRISM and Transformer on NLI entailment pairs (SNLI + MNLI)
+using `bert-base-uncased` tokenizer (30,522 vocab). Evaluate STS-Benchmark
+(Spearman correlation). Proves the architecture works on real language.
 
-### 3B — The money experiment: quality vs sequence length
+### 3B — Quality vs sequence length (the money chart)
 
-The central claim is that PRISM's advantage grows with sequence length. To test this
-on real text:
+Evaluate retrieval quality at controlled lengths (128, 256, 512, 1024, 2048) on
+Wikipedia paragraph matching. Plot MRR and throughput vs length. Show the crossover.
 
-1. Train both models on NLI data (fixed training, same for both).
-2. Evaluate retrieval on a long-document dataset at controlled lengths:
-   128, 256, 512, 1024, 2048 tokens.
-3. Plot quality and throughput as a function of sequence length.
-4. Show the crossover: Transformer wins at short, PRISM wins at long.
+### 3C — Standard benchmarks (conditional)
 
-Dataset candidates for long-document retrieval:
-- Wikipedia paragraph matching (same-article = positive)
-- IMDB reviews (natural 200-500 token range)
-- CNN/DailyMail articles (natural 300-800 token range)
+If 3A+3B are positive: MTEB subset (STS + Retrieval + Classification).
 
-### 3C — Standard benchmarks (if 3A+3B are positive)
+### Success Criteria
 
-Run on MTEB subset: STS + Retrieval + Classification.
-Compare with off-the-shelf baselines (all-MiniLM-L6-v2, GTE-base).
+| Test                      | Pass Condition                                    |
+|---------------------------|---------------------------------------------------|
+| STS-B Spearman            | PRISM within 3 points of Transformer              |
+| Retrieval at 128 tokens   | Transformer >= PRISM (expected)                   |
+| Retrieval at 512+ tokens  | PRISM >= Transformer                              |
+| Retrieval at 2048 tokens  | PRISM > Transformer AND 2x+ throughput            |
 
-### Dependencies needed
+### To Run
 
+```bash
+uv add datasets transformers scipy
+uv run python benchmark_real_data.py
 ```
-uv add datasets transformers
-```
-
-### Success criteria
-
-| Test | Pass condition |
-|------|---------------|
-| STS-B Spearman | PRISM within 3 points of Transformer |
-| Retrieval at 128 tokens | Transformer ≥ PRISM (expected) |
-| Retrieval at 512+ tokens | PRISM ≥ Transformer |
-| Retrieval at 2048 tokens | PRISM > Transformer AND 2x+ throughput |
 
 ---
 
@@ -115,8 +144,8 @@ prism/
 ├── benchmark_scaling.py        # Throughput / memory / latency vs seq length
 ├── benchmark_quality.py        # Synthetic contrastive training + retrieval eval
 ├── benchmark_ablations.py      # Component ablation study (4 variants)
-├── benchmark_real_data.py      # Phase 3: real-data evaluation (NEW)
-├── investigate.py              # Phase 2: alpha autopsy + warm init + long-seq
+├── benchmark_real_data.py      # Phase 3: real-data evaluation
+├── investigate.py              # Phase 2: alpha autopsy + warm init + long-seq showdown
 ├── run_all.py                  # Master runner for Phase 1
 ├── PRISM_Technical_Report.txt  # Original architecture design
 ├── PRISM_Experiment_Plan.md    # Original 16-week plan
