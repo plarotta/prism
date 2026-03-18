@@ -738,29 +738,26 @@ class PRISMForEmbedding(nn.Module):
 
 def prism_small(vocab_size: int = 32000, **kwargs) -> PRISMEncoder:
     """~30M params — comparable to MiniLM."""
-    return PRISMEncoder(
-        vocab_size=vocab_size, d=384, d_e=384,
-        n_layers=6, n_channels=6, max_len=8192,
-        mlp_ratio=2.0, dropout=0.1, cov_rank=24, **kwargs
-    )
+    defaults = dict(d=384, d_e=384, n_layers=6, n_channels=6,
+                    max_len=8192, mlp_ratio=2.0, dropout=0.1, cov_rank=24)
+    defaults.update(kwargs)
+    return PRISMEncoder(vocab_size=vocab_size, **defaults)
 
 
 def prism_base(vocab_size: int = 32000, **kwargs) -> PRISMEncoder:
     """~110M params — comparable to BERT-base."""
-    return PRISMEncoder(
-        vocab_size=vocab_size, d=768, d_e=768,
-        n_layers=12, n_channels=8, max_len=8192,
-        mlp_ratio=4.0, dropout=0.1, cov_rank=32, **kwargs
-    )
+    defaults = dict(d=768, d_e=768, n_layers=12, n_channels=8,
+                    max_len=8192, mlp_ratio=4.0, dropout=0.1, cov_rank=32)
+    defaults.update(kwargs)
+    return PRISMEncoder(vocab_size=vocab_size, **defaults)
 
 
 def prism_large(vocab_size: int = 32000, **kwargs) -> PRISMEncoder:
     """~330M params — comparable to BERT-large."""
-    return PRISMEncoder(
-        vocab_size=vocab_size, d=1024, d_e=1024,
-        n_layers=24, n_channels=8, max_len=16384,
-        mlp_ratio=4.0, dropout=0.1, cov_rank=48, **kwargs
-    )
+    defaults = dict(d=1024, d_e=1024, n_layers=24, n_channels=8,
+                    max_len=16384, mlp_ratio=4.0, dropout=0.1, cov_rank=48)
+    defaults.update(kwargs)
+    return PRISMEncoder(vocab_size=vocab_size, **defaults)
 
 
 # ---------------------------------------------------------------------------

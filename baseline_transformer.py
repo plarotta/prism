@@ -166,20 +166,18 @@ class TransformerForEmbedding(nn.Module):
 
 def transformer_small(vocab_size: int = 32000, **kwargs) -> TransformerEncoder:
     """~23M params — matched to prism_small."""
-    return TransformerEncoder(
-        vocab_size=vocab_size, d=384, d_e=384,
-        n_layers=6, n_heads=6, max_len=8192,
-        mlp_ratio=2.0, dropout=0.1, **kwargs
-    )
+    defaults = dict(d=384, d_e=384, n_layers=6, n_heads=6,
+                    max_len=8192, mlp_ratio=2.0, dropout=0.1)
+    defaults.update(kwargs)
+    return TransformerEncoder(vocab_size=vocab_size, **defaults)
 
 
 def transformer_base(vocab_size: int = 32000, **kwargs) -> TransformerEncoder:
     """~110M params — matched to prism_base / BERT-base."""
-    return TransformerEncoder(
-        vocab_size=vocab_size, d=768, d_e=768,
-        n_layers=12, n_heads=12, max_len=8192,
-        mlp_ratio=4.0, dropout=0.1, **kwargs
-    )
+    defaults = dict(d=768, d_e=768, n_layers=12, n_heads=12,
+                    max_len=8192, mlp_ratio=4.0, dropout=0.1)
+    defaults.update(kwargs)
+    return TransformerEncoder(vocab_size=vocab_size, **defaults)
 
 
 if __name__ == "__main__":

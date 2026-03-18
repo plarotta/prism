@@ -174,9 +174,10 @@ def run_all_benchmarks():
     print(f"Warmup iterations: {N_WARMUP}, Measure iterations: {N_MEASURE}")
     print()
 
-    # Build models
-    prism_model = prism_small(vocab_size=VOCAB_SIZE).to(DEVICE)
-    transformer_model = transformer_small(vocab_size=VOCAB_SIZE).to(DEVICE)
+    # Build models — max_len must cover the longest sequence we benchmark
+    max_len = max(SEQ_LENGTHS)
+    prism_model = prism_small(vocab_size=VOCAB_SIZE, max_len=max_len).to(DEVICE)
+    transformer_model = transformer_small(vocab_size=VOCAB_SIZE, max_len=max_len).to(DEVICE)
 
     print(f"PRISM params:       {count_params(prism_model):,}")
     print(f"Transformer params: {count_params(transformer_model):,}")
