@@ -639,13 +639,19 @@ def run_experiment(
     batch_size: int = 16,
     lr: float = 3e-4,
     micro_batch_cap: int = None,
+    eval_steps: list[int] = None,
 ) -> dict:
-    """Train a model and evaluate on all LoCoV1 tasks. Returns results dict.
+    """Train a model with checkpoint evaluation on all LoCoV1 tasks.
+
+    Uses train_with_checkpoints() to evaluate at intermediate steps,
+    matching the protocol from Experiment 0.
 
     Args:
         micro_batch_cap: If set, caps the micro-batch size (use for models with
             higher memory footprint than what _get_batch_config estimates, e.g.
             local attention variants with unfold overhead).
+        eval_steps: Steps at which to run full LoCoV1 eval. Defaults to every
+            1000 steps.
     """
     print(f"\n{'='*60}")
     print(f"  {name} (max_len={max_len})")
@@ -668,63 +674,33 @@ def run_experiment(
           f"grad_accum={bcfg['grad_accum_steps']}, "
           f"effective_batch={bcfg['micro_batch'] * bcfg['grad_accum_steps']}")
 
-    # Train
-    losses, train_time = train_contrastive(
-        wrapper, train_pairs, n_steps, name,
+    train_result = train_with_checkpoints(
+        wrapper, train_pairs, tasks, n_steps, name,
         max_len=max_len,
         micro_batch=bcfg["micro_batch"],
         grad_accum_steps=bcfg["grad_accum_steps"],
         lr=lr,
+        eval_steps=eval_steps,
+        eval_batch=bcfg["eval_batch"],
     )
 
-    # Evaluate
-    print(f"\n  Evaluating {name} on all 12 LoCoV1 tasks...")
-    task_results = {}
-    for task_name in LOCO_TASKS:
-        task_data = tasks[task_name]
-        if not task_data["queries"] or not task_data["documents"]:
-            continue
-        try:
-            metrics = evaluate_task_ndcg(
-                wrapper, task_data, max_len,
-                batch_size=bcfg["eval_batch"], device=DEVICE,
-            )
-            if metrics:
-                task_results[task_name] = metrics
-                print(f"    {task_name}: nDCG@10={metrics['nDCG@10']:.4f}")
-        except RuntimeError as e:
-            if "out of memory" in str(e).lower():
-                torch.cuda.empty_cache() if torch.cuda.is_available() else None
-                try:
-                    metrics = evaluate_task_ndcg(
-                        wrapper, task_data, max_len, batch_size=1, device=DEVICE,
-                    )
-                    if metrics:
-                        task_results[task_name] = metrics
-                        print(f"    {task_name}: nDCG@10={metrics['nDCG@10']:.4f} (batch=1)")
-                except RuntimeError as e2:
-                    print(f"    {task_name}: FAILED ({e2})")
-                    task_results[task_name] = {"failed": True, "error": str(e2)}
-            else:
-                print(f"    {task_name}: FAILED ({e})")
-                task_results[task_name] = {"failed": True, "error": str(e)}
-
-    valid_ndcg = [r["nDCG@10"] for r in task_results.values()
-                  if isinstance(r, dict) and "nDCG@10" in r]
-    avg_ndcg = float(np.mean(valid_ndcg)) if valid_ndcg else 0.0
+    # Final checkpoint is the authoritative result
+    final_ckpt = train_result["checkpoints"].get(n_steps, {})
 
     result = {
-        "task_results": task_results,
-        "avg_nDCG@10": avg_ndcg,
-        "train_time": train_time,
-        "final_loss": float(np.mean(losses[-100:])) if losses else 0.0,
-        "losses": [float(l) for l in losses],
+        "task_results": final_ckpt.get("task_results", {}),
+        "avg_nDCG@10": final_ckpt.get("avg_nDCG@10", 0.0),
+        "train_time": train_result["train_time"],
+        "final_loss": final_ckpt.get("loss", 0.0),
+        "losses": train_result["losses"],
+        "checkpoints": train_result["checkpoints"],
         "params": n_params,
         "max_len": max_len,
         "n_steps": n_steps,
         "lr": lr,
     }
-    print(f"\n  {name} avg nDCG@10: {avg_ndcg:.4f} (loss={result['final_loss']:.4f}, {train_time:.0f}s)")
+    print(f"\n  {name} avg nDCG@10: {result['avg_nDCG@10']:.4f} "
+          f"(loss={result['final_loss']:.4f}, {train_result['train_time']:.0f}s)")
 
     del wrapper, encoder
     if torch.cuda.is_available():

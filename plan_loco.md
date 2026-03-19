@@ -172,3 +172,86 @@ Total: ~3–4 weeks
 - **Minimum viable result:** PRISM-Simplified (no pretraining) beats naive Transformer baselines on LoCoV1 tasks with documents > 2K tokens
 - **Strong result:** Pretrained PRISM-Simplified is competitive with M2-BERT (within 5 nDCG@10 points on average)
 - **Home run:** PRISM-Simplified matches or beats M2-BERT with fewer parameters and simpler architecture, with the geometric decay ablation showing it's a meaningful inductive bias
+
+---
+
+## Phase 4: Hybrid Architecture Experiments (in progress)
+
+Phase 1 results revealed a key problem: **PRISM at 8K (0.578 nDCG@10) underperforms PRISM at 2K (0.689)**. Mean pooling averages over all token positions equally, diluting the embedding when documents contain boilerplate or low-information sections. At 2K, truncation accidentally helps by keeping only the information-dense beginning. At 8K, the model sees the full document but can't distinguish signal from noise at the pooling stage.
+
+This phase addresses the 8K < 2K gap through a series of targeted experiments implemented in `benchmark_hybrid.py`.
+
+### Experiment 0: Improved Baselines (complete)
+
+Re-ran the LoCoV1 baselines (PRISM-MeanPool + Transformer) with two key improvements over Phase 1:
+- **LR sweep:** Tested [1e-4, 3e-4, 5e-4, 1e-3] at 500 steps each, selected best per model (PRISM: 3e-4, Transformer: 1e-4)
+- **Extended training:** 7000 steps (up from 5000 in Phase 1)
+- **Checkpoint evaluation:** Full 12-task eval every 1000 steps to track convergence curves
+
+#### Results
+
+| Model | max_len | Params | Avg nDCG@10 | Train Time | Notes |
+|-------|---------|--------|-------------|------------|-------|
+| PRISM-MeanPool | 2048 | 19.2M | **0.770** | 1754s | Best overall result |
+| Transformer | 2048 | 19.8M | 0.672 | 3631s | Huge improvement from LR sweep |
+| PRISM-MeanPool | 8192 | 21.6M | 0.675 | 6661s | 8K < 2K gap persists |
+| Transformer | 8192 | 22.1M | — | discontinued | micro_batch=2, grad_accum=8; ~5s/step, discontinued at step 2200 after nDCG plateaued at 0.107 |
+
+**Key observations from Experiment 0:**
+- The Transformer jumped from 0.194 to 0.672 at 2K — the Phase 1 Transformer result was crippled by a suboptimal learning rate, not an architectural limitation. The LR sweep was critical.
+- PRISM still wins at 2K (0.770 vs 0.672, +9.8 points) but the gap narrowed significantly from +49.4 to +9.8.
+- The 8K < 2K gap for PRISM narrowed slightly (from 11.1 to 9.5 points) but persists, confirming mean pooling dilution as an ongoing problem.
+- PRISM converges ~2x faster wall-clock than the Transformer at 2K, and the Transformer is impractical at 8K (5s/step with micro_batch=2).
+- The Transformer at 8K was discontinued — at step 2200 it had only reached nDCG@10 = 0.107, with learning stalled. The O(n^2) cost + tiny micro-batches make it unviable.
+
+#### Convergence Trajectories (PRISM-MeanPool @ 2048)
+
+| Step | nDCG@10 | Loss |
+|------|---------|------|
+| 1000 | 0.218 | 0.689 |
+| 2000 | 0.390 | 0.329 |
+| 3000 | 0.513 | 0.153 |
+| 4000 | 0.601 | 0.111 |
+| 5000 | 0.704 | 0.063 |
+| 6000 | 0.752 | 0.054 |
+| 7000 | 0.770 | 0.032 |
+
+### Experiment 1: Attentive Pooling (pending)
+
+Replace mean pooling with a learned attentive pooling head — the core intervention to fix the 8K < 2K gap.
+
+**Architecture:** Single learned query vector q, softmax attention over token positions, weighted sum + projection + LayerNorm. Adds ~384 parameters (negligible). The hypothesis is that the recurrence backbone already captures useful long-range information that mean pooling averages away.
+
+| Run | Pooling | max_len | Purpose |
+|-----|---------|---------|---------|
+| 1a | Attentive | 2048 | Does attentive pooling help or hurt at 2K? |
+| 1b | Attentive | 8192 | Does attentive pooling fix the 8K degradation? |
+
+**Success criteria:** Run 1b > 0.675 (mean pool 8K). Ideal: Run 1b >= 0.770 (mean pool 2K).
+
+### Experiment 2: Multi-Head Attentive Pooling (conditional on Exp 1)
+
+Only runs if Experiment 1 shows improvement. K=4 and K=8 independent learned queries at 8192, each attending to different aspects of the document (e.g., entities vs topic sentences vs conclusions). Concatenated and projected down.
+
+### Experiment 3: Local Attention Hybrid (conditional)
+
+Insert a sliding-window attention layer (w=256 or w=512) after recurrence layer 4 of 6, giving the model one opportunity for precise local token-level matching within the recurrence stack. O(n*w) — preserves linear scaling. Only runs if the pooling fix alone doesn't fully close the 2K-vs-8K gap.
+
+### Experiment 4: Decay Spacing Ablation (independent)
+
+Tests whether geometric decay spacing is a meaningful inductive bias by comparing:
+- **Geometric** (current default): log-spaced decay rates
+- **Linear**: evenly spaced from 0 to 1-epsilon
+- **Random fixed**: uniformly sampled, frozen (seed=42)
+- **All-slow** (lambda=0.99): global context only
+- **All-fast** (lambda=0.1): local context only
+
+All at max_len=2048, 7000 steps. If geometric beats all variants, the log-spaced frequency decomposition is a genuine inductive bias — the core differentiator from M2-BERT.
+
+### Running the Experiments
+
+```bash
+uv run python benchmark_hybrid.py                           # all experiments
+uv run python benchmark_hybrid.py --skip-exp0               # skip baselines (already done)
+uv run python benchmark_hybrid.py --skip-exp2 --skip-exp3   # just Exp 0, 1, 4
+```

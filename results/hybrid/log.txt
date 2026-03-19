@@ -1,0 +1,349 @@
+============================================================
+  PRISM-MeanPool @ max_len=2048
+============================================================
+  Parameters: 19,193,088
+  LR: 3e-04 (from sweep)
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training PRISM-MeanPool (7000 steps, max_len=2048, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [PRISM-MeanPool] Step 100/7000  loss=1.7213  (20.4s)
+  [PRISM-MeanPool] Step 200/7000  loss=1.3754  (40.7s)
+  [PRISM-MeanPool] Step 300/7000  loss=1.2475  (61.0s)
+  [PRISM-MeanPool] Step 400/7000  loss=1.1237  (81.4s)
+  [PRISM-MeanPool] Step 500/7000  loss=1.0753  (101.7s)
+  [PRISM-MeanPool] Step 600/7000  loss=0.9445  (121.8s)
+  [PRISM-MeanPool] Step 700/7000  loss=0.8750  (141.9s)
+  [PRISM-MeanPool] Step 800/7000  loss=0.7713  (162.1s)
+  [PRISM-MeanPool] Step 900/7000  loss=0.7524  (182.4s)
+  [PRISM-MeanPool] Step 1000/7000  loss=0.6892  (202.7s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 1000...
+  [PRISM-MeanPool] Step 1000: avg nDCG@10=0.2184, loss=0.6892 (eval took 48s)
+  [PRISM-MeanPool] Step 1100/7000  loss=0.6290  (270.9s)
+  [PRISM-MeanPool] Step 1200/7000  loss=0.5749  (291.2s)
+  [PRISM-MeanPool] Step 1300/7000  loss=0.5376  (311.6s)
+  [PRISM-MeanPool] Step 1400/7000  loss=0.4546  (331.9s)
+  [PRISM-MeanPool] Step 1500/7000  loss=0.4755  (352.2s)
+  [PRISM-MeanPool] Step 1600/7000  loss=0.4440  (372.6s)
+  [PRISM-MeanPool] Step 1700/7000  loss=0.3907  (392.9s)
+  [PRISM-MeanPool] Step 1800/7000  loss=0.3520  (413.2s)
+  [PRISM-MeanPool] Step 1900/7000  loss=0.3732  (433.5s)
+  [PRISM-MeanPool] Step 2000/7000  loss=0.3288  (453.9s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 2000...
+  [PRISM-MeanPool] Step 2000: avg nDCG@10=0.3898, loss=0.3288 (eval took 48s)
+  [PRISM-MeanPool] Step 2100/7000  loss=0.2980  (522.1s)
+  [PRISM-MeanPool] Step 2200/7000  loss=0.2701  (542.4s)
+  [PRISM-MeanPool] Step 2300/7000  loss=0.2502  (562.7s)
+  [PRISM-MeanPool] Step 2400/7000  loss=0.2734  (583.0s)
+  [PRISM-MeanPool] Step 2500/7000  loss=0.2533  (603.3s)
+  [PRISM-MeanPool] Step 2600/7000  loss=0.2461  (623.6s)
+  [PRISM-MeanPool] Step 2700/7000  loss=0.2022  (643.8s)
+  [PRISM-MeanPool] Step 2800/7000  loss=0.1989  (664.1s)
+  [PRISM-MeanPool] Step 2900/7000  loss=0.1980  (684.4s)
+  [PRISM-MeanPool] Step 3000/7000  loss=0.1532  (704.7s)
+  [PRISM-MeanPool] Checkpoint eval at step 3000...
+  [PRISM-MeanPool] Step 3000: avg nDCG@10=0.5125, loss=0.1532 (eval took 48s)
+  [PRISM-MeanPool] Step 3100/7000  loss=0.1614  (772.6s)
+  [PRISM-MeanPool] Step 3200/7000  loss=0.1411  (792.7s)
+  [PRISM-MeanPool] Step 3300/7000  loss=0.1620  (812.9s)
+  [PRISM-MeanPool] Step 3400/7000  loss=0.1343  (833.2s)
+  [PRISM-MeanPool] Step 3500/7000  loss=0.1428  (853.6s)
+  [PRISM-MeanPool] Step 3600/7000  loss=0.1177  (873.9s)
+  [PRISM-MeanPool] Step 3700/7000  loss=0.1239  (894.2s)
+  [PRISM-MeanPool] Step 3800/7000  loss=0.0941  (914.5s)
+  [PRISM-MeanPool] Step 3900/7000  loss=0.1138  (934.8s)
+  [PRISM-MeanPool] Step 4000/7000  loss=0.1108  (955.1s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 4000...
+  [PRISM-MeanPool] Step 4000: avg nDCG@10=0.6014, loss=0.1108 (eval took 48s)
+  [PRISM-MeanPool] Step 4100/7000  loss=0.0864  (1023.3s)
+  [PRISM-MeanPool] Step 4200/7000  loss=0.0825  (1043.6s)
+  [PRISM-MeanPool] Step 4300/7000  loss=0.0890  (1064.0s)
+  [PRISM-MeanPool] Step 4400/7000  loss=0.0729  (1084.3s)
+  [PRISM-MeanPool] Step 4500/7000  loss=0.0815  (1104.6s)
+  [PRISM-MeanPool] Step 4600/7000  loss=0.0748  (1124.9s)
+  [PRISM-MeanPool] Step 4700/7000  loss=0.0757  (1145.2s)
+  [PRISM-MeanPool] Step 4800/7000  loss=0.0800  (1165.6s)
+  [PRISM-MeanPool] Step 4900/7000  loss=0.0586  (1185.9s)
+  [PRISM-MeanPool] Step 5000/7000  loss=0.0626  (1206.2s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 5000...
+  [PRISM-MeanPool] Step 5000: avg nDCG@10=0.7043, loss=0.0626 (eval took 48s)
+  [PRISM-MeanPool] Step 5100/7000  loss=0.0590  (1274.4s)
+  [PRISM-MeanPool] Step 5200/7000  loss=0.0532  (1294.7s)
+  [PRISM-MeanPool] Step 5300/7000  loss=0.0468  (1315.1s)
+  [PRISM-MeanPool] Step 5400/7000  loss=0.0722  (1335.4s)
+  [PRISM-MeanPool] Step 5500/7000  loss=0.0467  (1356.2s)
+  [PRISM-MeanPool] Step 5600/7000  loss=0.0508  (1376.9s)
+  [PRISM-MeanPool] Step 5700/7000  loss=0.0548  (1397.4s)
+  [PRISM-MeanPool] Step 5800/7000  loss=0.0388  (1417.8s)
+  [PRISM-MeanPool] Step 5900/7000  loss=0.0490  (1437.8s)
+  [PRISM-MeanPool] Step 6000/7000  loss=0.0538  (1457.9s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 6000...
+  [PRISM-MeanPool] Step 6000: avg nDCG@10=0.7524, loss=0.0538 (eval took 48s)
+  [PRISM-MeanPool] Step 6100/7000  loss=0.0453  (1525.8s)
+  [PRISM-MeanPool] Step 6200/7000  loss=0.0488  (1545.9s)
+  [PRISM-MeanPool] Step 6300/7000  loss=0.0427  (1565.9s)
+  [PRISM-MeanPool] Step 6400/7000  loss=0.0463  (1586.0s)
+  [PRISM-MeanPool] Step 6500/7000  loss=0.0379  (1606.0s)
+  [PRISM-MeanPool] Step 6600/7000  loss=0.0344  (1626.1s)
+  [PRISM-MeanPool] Step 6700/7000  loss=0.0461  (1646.1s)
+  [PRISM-MeanPool] Step 6800/7000  loss=0.0401  (1666.2s)
+  [PRISM-MeanPool] Step 6900/7000  loss=0.0356  (1686.2s)
+  [PRISM-MeanPool] Step 7000/7000  loss=0.0315  (1706.3s)
+  [PRISM-MeanPool] Checkpoint eval at step 7000...
+  [PRISM-MeanPool] Step 7000: avg nDCG@10=0.7700, loss=0.0315 (eval took 48s)
+  [PRISM-MeanPool] Training complete in 1754.1s
+
+  PRISM-MeanPool @ 2048: avg nDCG@10=0.7700
+
+============================================================
+  Transformer @ max_len=2048
+============================================================
+  Parameters: 19,760,640
+  LR: 1e-04 (from sweep)
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training Transformer (7000 steps, max_len=2048, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [Transformer] Step 100/7000  loss=1.8188  (40.2s)
+  [Transformer] Step 200/7000  loss=1.5204  (80.5s)
+  [Transformer] Step 300/7000  loss=1.4830  (120.7s)
+  [Transformer] Step 400/7000  loss=1.4030  (160.9s)
+  [Transformer] Step 500/7000  loss=1.3785  (201.2s)
+  [Transformer] Step 600/7000  loss=1.2739  (241.4s)
+  [Transformer] Step 700/7000  loss=1.2745  (281.6s)
+  [Transformer] Step 800/7000  loss=1.1732  (321.9s)
+  [Transformer] Step 900/7000  loss=1.1431  (362.1s)
+  [Transformer] Step 1000/7000  loss=1.0555  (402.4s)
+
+  [Transformer] Checkpoint eval at step 1000...
+  [Transformer] Step 1000: avg nDCG@10=0.2870, loss=1.0555 (eval took 116s)
+  [Transformer] Step 1100/7000  loss=1.0481  (558.7s)
+  [Transformer] Step 1200/7000  loss=1.0083  (599.0s)
+  [Transformer] Step 1300/7000  loss=0.9657  (639.3s)
+  [Transformer] Step 1400/7000  loss=0.9777  (679.5s)
+  [Transformer] Step 1500/7000  loss=0.9198  (719.8s)
+  [Transformer] Step 1600/7000  loss=0.8397  (760.1s)
+  [Transformer] Step 1700/7000  loss=0.7873  (800.4s)
+  [Transformer] Step 1800/7000  loss=0.7817  (840.7s)
+  [Transformer] Step 1900/7000  loss=0.7520  (880.9s)
+  [Transformer] Step 2000/7000  loss=0.6946  (921.2s)
+
+  [Transformer] Checkpoint eval at step 2000...
+  [Transformer] Step 2000: avg nDCG@10=0.3659, loss=0.6946 (eval took 116s)
+  [Transformer] Step 2100/7000  loss=0.6768  (1077.5s)
+  [Transformer] Step 2200/7000  loss=0.6315  (1117.8s)
+  [Transformer] Step 2300/7000  loss=0.6401  (1158.1s)
+  [Transformer] Step 2400/7000  loss=0.5953  (1198.4s)
+  [Transformer] Step 2500/7000  loss=0.5762  (1238.6s)
+  [Transformer] Step 2600/7000  loss=0.5385  (1278.8s)
+  [Transformer] Step 2700/7000  loss=0.4812  (1319.1s)
+  [Transformer] Step 2800/7000  loss=0.4794  (1359.4s)
+  [Transformer] Step 2900/7000  loss=0.4613  (1399.7s)
+  [Transformer] Step 3000/7000  loss=0.4524  (1440.0s)
+  [Transformer] Checkpoint eval at step 3000...
+  [Transformer] Step 3000: avg nDCG@10=0.4575, loss=0.4524 (eval took 116s)
+  [Transformer] Step 3100/7000  loss=0.4187  (1596.2s)
+  [Transformer] Step 3200/7000  loss=0.3796  (1636.4s)
+  [Transformer] Step 3300/7000  loss=0.3854  (1676.7s)
+  [Transformer] Step 3400/7000  loss=0.3554  (1717.0s)
+  [Transformer] Step 3500/7000  loss=0.3411  (1757.3s)
+  [Transformer] Step 3600/7000  loss=0.2996  (1797.6s)
+  [Transformer] Step 3700/7000  loss=0.2990  (1837.8s)
+  [Transformer] Step 3800/7000  loss=0.2763  (1878.1s)
+  [Transformer] Step 3900/7000  loss=0.3063  (1918.4s)
+  [Transformer] Step 4000/7000  loss=0.2740  (1958.6s)
+
+  [Transformer] Checkpoint eval at step 4000...
+  [Transformer] Step 4000: avg nDCG@10=0.5417, loss=0.2740 (eval took 116s)
+  [Transformer] Step 4100/7000  loss=0.2727  (2115.0s)
+  [Transformer] Step 4200/7000  loss=0.2326  (2155.2s)
+  [Transformer] Step 4300/7000  loss=0.2391  (2195.5s)
+  [Transformer] Step 4400/7000  loss=0.2617  (2235.8s)
+  [Transformer] Step 4500/7000  loss=0.2200  (2276.1s)
+  [Transformer] Step 4600/7000  loss=0.2079  (2316.4s)
+  [Transformer] Step 4700/7000  loss=0.2011  (2356.6s)
+  [Transformer] Step 4800/7000  loss=0.1986  (2396.9s)
+  [Transformer] Step 4900/7000  loss=0.1912  (2437.2s)
+  [Transformer] Step 5000/7000  loss=0.1917  (2477.5s)
+
+  [Transformer] Checkpoint eval at step 5000...
+  [Transformer] Step 5000: avg nDCG@10=0.6061, loss=0.1917 (eval took 116s)
+  [Transformer] Step 5100/7000  loss=0.1806  (2633.8s)
+  [Transformer] Step 5200/7000  loss=0.1695  (2674.2s)
+  [Transformer] Step 5300/7000  loss=0.1681  (2714.4s)
+  [Transformer] Step 5400/7000  loss=0.1769  (2754.7s)
+  [Transformer] Step 5500/7000  loss=0.1597  (2795.0s)
+  [Transformer] Step 5600/7000  loss=0.1508  (2835.2s)
+  [Transformer] Step 5700/7000  loss=0.1565  (2875.5s)
+  [Transformer] Step 5800/7000  loss=0.1352  (2915.7s)
+  [Transformer] Step 5900/7000  loss=0.1475  (2956.0s)
+  [Transformer] Step 6000/7000  loss=0.1473  (2996.2s)
+
+  [Transformer] Checkpoint eval at step 6000...
+  [Transformer] Step 6000: avg nDCG@10=0.6524, loss=0.1473 (eval took 116s)
+  [Transformer] Step 6100/7000  loss=0.1337  (3152.4s)
+  [Transformer] Step 6200/7000  loss=0.1280  (3192.7s)
+  [Transformer] Step 6300/7000  loss=0.1491  (3233.0s)
+  [Transformer] Step 6400/7000  loss=0.1194  (3273.3s)
+  [Transformer] Step 6500/7000  loss=0.1370  (3313.6s)
+  [Transformer] Step 6600/7000  loss=0.1245  (3353.8s)
+  [Transformer] Step 6700/7000  loss=0.1278  (3394.1s)
+  [Transformer] Step 6800/7000  loss=0.1176  (3434.4s)
+  [Transformer] Step 6900/7000  loss=0.1067  (3474.7s)
+  [Transformer] Step 7000/7000  loss=0.1089  (3515.0s)
+
+  [Transformer] Checkpoint eval at step 7000...
+  [Transformer] Step 7000: avg nDCG@10=0.6716, loss=0.1089 (eval took 116s)
+  [Transformer] Training complete in 3631.0s
+
+  Transformer @ 2048: avg nDCG@10=0.6716
+
+============================================================
+  PRISM-MeanPool @ max_len=8192
+============================================================
+  Parameters: 21,552,384
+  LR: 3e-04 (from sweep)
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training PRISM-MeanPool (7000 steps, max_len=8192, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [PRISM-MeanPool] Step 100/7000  loss=1.8065  (71.0s)
+  [PRISM-MeanPool] Step 200/7000  loss=1.3916  (142.0s)
+  [PRISM-MeanPool] Step 300/7000  loss=1.2938  (213.0s)
+  [PRISM-MeanPool] Step 400/7000  loss=1.2412  (283.9s)
+  [PRISM-MeanPool] Step 500/7000  loss=1.1545  (355.0s)
+  [PRISM-MeanPool] Step 600/7000  loss=1.0641  (425.9s)
+  [PRISM-MeanPool] Step 700/7000  loss=0.9626  (496.9s)
+  [PRISM-MeanPool] Step 800/7000  loss=0.8635  (567.8s)
+  [PRISM-MeanPool] Step 900/7000  loss=0.7993  (638.8s)
+  [PRISM-MeanPool] Step 1000/7000  loss=0.7540  (709.8s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 1000...
+  [PRISM-MeanPool] Step 1000: avg nDCG@10=0.1677, loss=0.7540 (eval took 242s)
+  [PRISM-MeanPool] Step 1100/7000  loss=0.6739  (1022.3s)
+  [PRISM-MeanPool] Step 1200/7000  loss=0.6691  (1093.3s)
+  [PRISM-MeanPool] Step 1300/7000  loss=0.6671  (1164.3s)
+  [PRISM-MeanPool] Step 1400/7000  loss=0.5541  (1235.2s)
+  [PRISM-MeanPool] Step 1500/7000  loss=0.5882  (1306.2s)
+  [PRISM-MeanPool] Step 1600/7000  loss=0.4803  (1377.2s)
+  [PRISM-MeanPool] Step 1700/7000  loss=0.4795  (1448.2s)
+  [PRISM-MeanPool] Step 1800/7000  loss=0.4328  (1519.2s)
+  [PRISM-MeanPool] Step 1900/7000  loss=0.4271  (1590.2s)
+  [PRISM-MeanPool] Step 2000/7000  loss=0.4065  (1661.3s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 2000...
+  [PRISM-MeanPool] Step 2000: avg nDCG@10=0.2783, loss=0.4065 (eval took 242s)
+  [PRISM-MeanPool] Step 2100/7000  loss=0.3773  (1973.9s)
+  [PRISM-MeanPool] Step 2200/7000  loss=0.3255  (2044.9s)
+  [PRISM-MeanPool] Step 2300/7000  loss=0.3239  (2115.8s)
+  [PRISM-MeanPool] Step 2400/7000  loss=0.3122  (2186.9s)
+  [PRISM-MeanPool] Step 2500/7000  loss=0.2917  (2257.9s)
+  [PRISM-MeanPool] Step 2600/7000  loss=0.2958  (2328.9s)
+  [PRISM-MeanPool] Step 2700/7000  loss=0.2437  (2400.0s)
+  [PRISM-MeanPool] Step 2800/7000  loss=0.2456  (2471.0s)
+  [PRISM-MeanPool] Step 2900/7000  loss=0.2516  (2542.1s)
+  [PRISM-MeanPool] Step 3000/7000  loss=0.1962  (2613.2s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 3000...
+  [PRISM-MeanPool] Step 3000: avg nDCG@10=0.3930, loss=0.1962 (eval took 242s)
+  [PRISM-MeanPool] Step 3100/7000  loss=0.2121  (2925.9s)
+  [PRISM-MeanPool] Step 3200/7000  loss=0.1783  (2997.0s)
+  [PRISM-MeanPool] Step 3300/7000  loss=0.1976  (3067.9s)
+  [PRISM-MeanPool] Step 3400/7000  loss=0.1810  (3138.9s)
+  [PRISM-MeanPool] Step 3500/7000  loss=0.1657  (3209.9s)
+  [PRISM-MeanPool] Step 3600/7000  loss=0.1536  (3280.9s)
+  [PRISM-MeanPool] Step 3700/7000  loss=0.1498  (3351.9s)
+  [PRISM-MeanPool] Step 3800/7000  loss=0.1327  (3422.9s)
+  [PRISM-MeanPool] Step 3900/7000  loss=0.1709  (3493.8s)
+  [PRISM-MeanPool] Step 4000/7000  loss=0.1313  (3564.8s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 4000...
+  [PRISM-MeanPool] Step 4000: avg nDCG@10=0.4835, loss=0.1313 (eval took 241s)
+  [PRISM-MeanPool] Step 4100/7000  loss=0.1077  (3877.3s)
+  [PRISM-MeanPool] Step 4200/7000  loss=0.1080  (3948.2s)
+  [PRISM-MeanPool] Step 4300/7000  loss=0.1035  (4019.2s)
+  [PRISM-MeanPool] Step 4400/7000  loss=0.1109  (4090.1s)
+  [PRISM-MeanPool] Step 4500/7000  loss=0.0981  (4161.2s)
+  [PRISM-MeanPool] Step 4600/7000  loss=0.0867  (4232.2s)
+  [PRISM-MeanPool] Step 4700/7000  loss=0.0965  (4303.2s)
+  [PRISM-MeanPool] Step 4800/7000  loss=0.0995  (4374.2s)
+  [PRISM-MeanPool] Step 4900/7000  loss=0.0626  (4445.2s)
+  [PRISM-MeanPool] Step 5000/7000  loss=0.0788  (4516.3s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 5000...
+  [PRISM-MeanPool] Step 5000: avg nDCG@10=0.5597, loss=0.0788 (eval took 242s)
+  [PRISM-MeanPool] Step 5100/7000  loss=0.0687  (4828.9s)
+  [PRISM-MeanPool] Step 5200/7000  loss=0.0744  (4900.0s)
+  [PRISM-MeanPool] Step 5300/7000  loss=0.0627  (4970.9s)
+  [PRISM-MeanPool] Step 5400/7000  loss=0.0741  (5041.9s)
+  [PRISM-MeanPool] Step 5500/7000  loss=0.0619  (5112.8s)
+  [PRISM-MeanPool] Step 5600/7000  loss=0.0662  (5183.7s)
+  [PRISM-MeanPool] Step 5700/7000  loss=0.0523  (5254.7s)
+  [PRISM-MeanPool] Step 5800/7000  loss=0.0548  (5325.7s)
+  [PRISM-MeanPool] Step 5900/7000  loss=0.0677  (5396.7s)
+  [PRISM-MeanPool] Step 6000/7000  loss=0.0715  (5467.8s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 6000...
+  [PRISM-MeanPool] Step 6000: avg nDCG@10=0.6419, loss=0.0715 (eval took 242s)
+  [PRISM-MeanPool] Step 6100/7000  loss=0.0550  (5780.4s)
+  [PRISM-MeanPool] Step 6200/7000  loss=0.0596  (5851.4s)
+  [PRISM-MeanPool] Step 6300/7000  loss=0.0662  (5922.4s)
+  [PRISM-MeanPool] Step 6400/7000  loss=0.0591  (5993.5s)
+  [PRISM-MeanPool] Step 6500/7000  loss=0.0606  (6064.5s)
+  [PRISM-MeanPool] Step 6600/7000  loss=0.0464  (6135.5s)
+  [PRISM-MeanPool] Step 6700/7000  loss=0.0705  (6206.6s)
+  [PRISM-MeanPool] Step 6800/7000  loss=0.0529  (6277.5s)
+  [PRISM-MeanPool] Step 6900/7000  loss=0.0458  (6348.6s)
+  [PRISM-MeanPool] Step 7000/7000  loss=0.0465  (6419.6s)
+  [PRISM-MeanPool] Checkpoint eval at step 7000...
+  [PRISM-MeanPool] Step 7000: avg nDCG@10=0.6747, loss=0.0465 (eval took 242s)
+  [PRISM-MeanPool] Training complete in 6661.3s
+
+  PRISM-MeanPool @ 8192: avg nDCG@10=0.6747
+
+============================================================
+  Transformer @ max_len=8192
+============================================================
+  Parameters: 22,119,936
+  LR: 1e-04 (from sweep)
+  Batch config: micro_batch=2, grad_accum=8, effective_batch=16
+
+Training Transformer (7000 steps, max_len=8192, micro_batch=2, accum=8, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [Transformer] Step 100/7000  loss=0.4087  (510.3s)
+  [Transformer] Step 200/7000  loss=0.2877  (1020.5s)
+  [Transformer] Step 300/7000  loss=0.3145  (1530.9s)
+  [Transformer] Step 400/7000  loss=0.3244  (2041.1s)
+  [Transformer] Step 500/7000  loss=0.2968  (2551.2s)
+  [Transformer] Step 600/7000  loss=0.2733  (3061.5s)
+  [Transformer] Step 700/7000  loss=0.2682  (3571.8s)
+  [Transformer] Step 800/7000  loss=0.2553  (4082.1s)
+  [Transformer] Step 900/7000  loss=0.2549  (4592.2s)
+  [Transformer] Step 1000/7000  loss=0.2288  (5102.4s)
+
+  [Transformer] Checkpoint eval at step 1000...
+  [Transformer] Step 1000: avg nDCG@10=0.0875, loss=0.2288 (eval took 1549s)
+  [Transformer] Step 1100/7000  loss=0.2457  (7161.3s)
+  [Transformer] Step 1200/7000  loss=0.2231  (7671.4s)
+  [Transformer] Step 1300/7000  loss=0.1984  (8181.5s)
+  [Transformer] Step 1400/7000  loss=0.2438  (8691.9s)
+  [Transformer] Step 1500/7000  loss=0.1814  (9202.4s)
+  [Transformer] Step 1600/7000  loss=0.1948  (9713.0s)
+  [Transformer] Step 1700/7000  loss=0.1737  (10223.5s)
+  [Transformer] Step 1800/7000  loss=0.1933  (10733.8s)
+  [Transformer] Step 1900/7000  loss=0.1881  (11244.0s)
+  [Transformer] Step 2000/7000  loss=0.2044  (11754.4s)
+
+  [Transformer] Checkpoint eval at step 2000...
+  [Transformer] Step 2000: avg nDCG@10=0.1074, loss=0.2044 (eval took 1548s)
+  [Transformer] Step 2100/7000  loss=0.1847  (13813.1s)
+  [Transformer] Step 2200/7000  loss=0.1621  (14323.4s)
+
+  - discontinued -
+
+  
