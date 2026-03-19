@@ -267,6 +267,8 @@ PRISM at 2048 outperforms M2-BERT-80M-8K despite 4x fewer parameters and no pret
 - PRISM wins on real-data length-controlled retrieval (CNN/DailyMail) at both 128 and 256 tokens
 - Mean pooling strictly outperforms attentive covariance pooling — confirmed in both original and V2 implementations
 - **The Transformer cannot train at 8K tokens on a 95 GB GPU** — PRISM handles it at micro_batch=16
+- The Transformer's Phase 5 LoCoV1 score (0.194) was crippled by suboptimal LR — with tuned LR it reaches 0.672, but PRISM still wins (+9.8 points at 2K)
+- The 8K < 2K gap is primarily a backbone capacity problem, not a pooling problem — attentive pooling only recovers +1.8 nDCG@10 points at 8K
 
 **Definitively disproven:**
 - Cross-scale bilinear interference as a quality driver — inert at short sequences, catastrophically harmful at long sequences (-24.4 MRR vs simplified), not rescued by targeted numerical fixes
@@ -274,56 +276,50 @@ PRISM at 2048 outperforms M2-BERT-80M-8K despite 4x fewer parameters and no pret
 - The "implementation bug" hypothesis for component failure — seven targeted fixes addressing every identified numerical issue failed to close the gap
 - Learned decay rates providing any benefit over fixed geometric spacing
 
+**Definitively ruled out as fixes for the 8K < 2K gap:**
+- Attentive pooling — only +1.8 nDCG@10 at 8K, slightly hurts at 2K (-1.7). Pooling is not the bottleneck.
+
 **Open questions:**
 - Whether PRISM's advantage persists at larger model scales (100M+ parameters)
 - Whether pretraining (MLM on C4/Wikipedia) would close the 2K→8K gap for PRISM and make the 8K results competitive with or better than 2K
 - Whether the LoCoV1 results would hold under a zero-shot evaluation protocol (pretrain + fine-tune on separate retrieval data, evaluate on LoCoV1)
 - Whether the novel components might help at larger scale where the model has more capacity to learn cross-channel interactions
-- **Whether attentive pooling fixes the 8K < 2K degradation** (Phase 6, ready to run)
-- **Whether geometric decay spacing is a meaningful inductive bias vs linear/random** (Phase 6, ready to run)
+- **Whether geometric decay spacing is a meaningful inductive bias vs linear/random** (Experiment 4, pending)
+- Whether wider channels or more channels would close the 8K < 2K gap (backbone capacity hypothesis)
 
-## 7b. Phase 6: Hybrid Architecture Experiments (ready to run)
+## 7b. Phase 6: Hybrid Architecture Experiments
 
-### The 8K < 2K Problem
+### Experiment 0: Improved Baselines (complete)
 
-PRISM-Simplified at 8K (0.578) scores lower than at 2K (0.689) across all 12 LoCoV1 tasks. Diagnosis: mean pooling averages over all token positions equally, which dilutes the embedding when documents contain boilerplate, repetitive language, or low-information sections. At 2K, truncation accidentally helps by keeping only the information-dense beginning. At 8K, the model sees the full document but can't distinguish signal from noise at the pooling stage.
+Re-ran LoCoV1 baselines with LR sweep and 7000 steps. Critical finding: the Phase 5 Transformer score (0.194) was due to a bad learning rate. With tuned LR (1e-4 vs the default 3e-4), the Transformer reaches 0.672 — still below PRISM (0.770) but the gap narrowed from +49.4 to +9.8 nDCG@10 points.
 
-### Proposed Fix: Attentive Pooling
+| Model | max_len | Avg nDCG@10 | Notes |
+|-------|---------|-------------|-------|
+| PRISM-MeanPool | 2048 | **0.770** | Best overall |
+| Transformer | 2048 | 0.672 | LR-fixed, +47.8 pts vs Phase 5 |
+| PRISM-MeanPool | 8192 | 0.675 | 8K < 2K gap persists |
+| Transformer | 8192 | ~0.107 | Discontinued (5s/step, stalled) |
 
-Replace mean pooling with a learned attentive pooling head — a minimal intervention that lets the model selectively weight informative positions while keeping the entire recurrence backbone unchanged.
+### Experiment 1: Attentive Pooling (complete)
 
-```
-AttentivePooling:
-  - Learned query vector q ∈ R^d (single parameter, not input-dependent)
-  - Attention scores: a_t = softmax(q · f_t / sqrt(d))
-  - Weighted sum: e = Σ a_t * f_t
-  - Project + normalize: embedding = LayerNorm(Linear(e))
-```
+Tested whether replacing mean pooling with a learned attentive query vector fixes the 8K < 2K gap.
 
-Adds ~d parameters (384 for PRISM-Small) — negligible. Uses a learned query rather than input-dependent (the original attentive covariance pooling used the slowest channel's last hidden state, which couples pooling to a specific channel and has failure modes from low-quality query states).
+| Config | Avg nDCG@10 | vs Mean Pool |
+|--------|-------------|-------------|
+| Attentive @ 2048 | 0.753 | -1.7 pts (mean pool better) |
+| Attentive @ 8192 | **0.692** | +1.8 pts (attentive better) |
 
-### Experiment Design
+**Result: pooling is not the bottleneck.** Attentive pooling gives a modest +1.8 point boost at 8K but slightly hurts at 2K. The 8K < 2K gap narrows from 9.5 to 7.8 points but is far from closed. This confirms the "backbone capacity" hypothesis: the 384-dim hidden state cannot compress 8K tokens of real language regardless of pooling strategy.
 
-Five experiment groups implemented in `benchmark_hybrid.py`:
+### Experiments 2-3: Skipped
 
-| Experiment | What | Conditional On |
-|------------|------|----------------|
-| **0: Improved Baselines** | PRISM-MeanPool + Transformer with LR sweep and checkpoint eval | — |
-| **1: Attentive Pooling** | Single-query attentive pooling at 2K and 8K | — |
-| **2: Multi-Head Pooling** | K=4, K=8 learned queries at 8K | Exp 1 shows improvement |
-| **3: Local Attention Hybrid** | Sliding-window attention (w=256, w=512) after recurrence layer 4 | Gap remains after Exp 1 |
-| **4: Decay Spacing** | Geometric vs linear vs random vs all-slow vs all-fast | Independent |
+Multi-head pooling and local attention hybrid skipped — the marginal pooling gains don't justify further exploration in that direction.
 
-### What Each Outcome Would Mean
+### Experiment 4: Decay Spacing Ablation (pending)
 
-- **Attentive pooling fixes 8K:** Mean pooling dilution was the bottleneck; the recurrence backbone already captures useful long-range information that mean pooling was averaging away.
-- **Both 2K and 8K improve:** Attentive pooling is strictly better than mean pooling. The earlier ablation where mean pooling beat covariance pooling was about the covariance sketch, not attention at the pooling stage.
-- **Neither improves:** The bottleneck is in the recurrence backbone's capacity (384-dim hidden state can't compress 8K tokens regardless of pooling). Points toward wider or more channels.
-- **Geometric decay beats all spacing variants:** The log-spaced frequency decomposition is a genuine inductive bias — the core differentiator from M2-BERT.
+Tests geometric vs linear vs random vs all-slow vs all-fast decay spacing at max_len=2048. Results pending.
 
 ## 8. Current State and Next Steps
-
-**The LoCoV1 benchmark is the strongest result to date.** PRISM-Simplified dominates an established 12-task retrieval benchmark spanning multiple domains, beating a Transformer by 3.5x and outperforming M2-BERT-80M despite having 4x fewer parameters and no pretraining.
 
 ### The final architecture
 
@@ -338,39 +334,45 @@ PRISM-Simplified = Embedding
                  → LayerNorm
 ```
 
-No interference. No covariance pooling. The contribution is empirical:
+No interference. No covariance pooling. Attentive pooling tested and provides marginal benefit at 8K (+1.8 pts) but slightly hurts at 2K — mean pooling remains the default.
 
 > A bidirectional multi-channel state-space encoder with fixed geometric decay rates beats a parameter-matched Transformer on embedding quality at sequences beyond ~256 tokens, with O(n) scaling, 2x+ inference speedup at 2K+ tokens, and order-of-magnitude memory savings.
 
-**Potential upgrade (Phase 6, pending results):** Replace mean pooling with learned attentive pooling. If successful, the architecture becomes:
+### Updated best results (with LR sweep + 7000 steps)
 
-```
-PRISM-Attentive = Embedding
-                → Frequency-stratified projection (C channels)
-                → Fixed-rate gated linear recurrence (geometric decay rates)
-                → Bidirectional gated fusion
-                → Attentive pooling (learned query)
-                → LayerNorm
-```
+| Model | max_len | Avg nDCG@10 |
+|-------|---------|-------------|
+| **PRISM-MeanPool** | **2048** | **0.770** |
+| PRISM-Attentive | 8192 | 0.692 |
+| PRISM-MeanPool | 8192 | 0.675 |
+| Transformer (tuned) | 2048 | 0.672 |
+| M2-BERT-80M (8K) | 8192 | ~0.506 |
+| BM25 | — | ~0.486 |
+
+PRISM advantage over the tuned Transformer: +9.8 nDCG@10 points at 2K. The gap is smaller than the +49.4 from Phase 5 (which was inflated by a bad Transformer LR), but still substantial and consistent across all 12 tasks.
+
+### The 8K < 2K gap: diagnosis updated
+
+The pooling hypothesis has been tested and ruled out as the primary cause. Attentive pooling confirms mean pooling dilution is real but minor (~1.8 pts). The remaining gap (~7.8 pts) points to backbone capacity: a 384-dim hidden state across 6 layers cannot compress 8K tokens of real language as effectively as it handles 2K. Likely fixes: wider channels, more channels, or pretraining on long sequences.
 
 ### Immediate next step
 
-Run the Phase 6 hybrid experiments (`uv run python benchmark_hybrid.py`). These directly address the 8K < 2K gap — the most important open question for the PRISM narrative. If attentive pooling fixes the gap, the story becomes: "PRISM scales linearly *and* improves with context length."
+Experiment 4 results (decay spacing ablation) pending. This tests whether geometric spacing is a genuine inductive bias — a core scientific claim for the architecture.
 
 ### What a paper would need
 
-The LoCoV1 results substantially strengthen the case. Remaining gaps:
+1. **Validate geometric decay as inductive bias.** Experiment 4 (pending). Key for differentiating from M2-BERT.
 
-1. **Resolve the 8K < 2K paradox.** Phase 6 experiments (attentive pooling, local attention) are designed to address this directly. If they succeed, the paper narrative becomes much cleaner.
+2. **Fair comparison with M2-BERT.** Current LoCoV1 results are strong but the training protocol differs (we train on LoCoV1 pairs; M2-BERT is evaluated zero-shot). Implementing the pretrain → fine-tune → zero-shot eval pipeline would make this comparison rigorous.
 
-2. **Fair comparison with M2-BERT.** Current LoCoV1 results are strong but the training protocol differs (we train on LoCoV1 pairs; M2-BERT is evaluated zero-shot). Implementing the pretrain → fine-tune → zero-shot eval pipeline from Plan Loco Phase 2 would make this comparison rigorous.
+3. **Address the 8K < 2K gap.** Pooling fixes are exhausted. Next directions: wider/deeper backbone, pretraining on long sequences, or accepting that 2K truncation is the right operating point for this model scale.
 
-3. **Complete Transformer at 8K.** Experiment 0 in `benchmark_hybrid.py` re-runs the Transformer with gradient accumulation (micro_batch=2, grad_accum=8). Even a poor result is important for the narrative.
+4. **Scale sensitivity.** All experiments use ~20M parameter models. At least one experiment at 100M+ would show whether findings hold.
 
-4. **Validate geometric decay as inductive bias.** Experiment 4 tests whether the log-spaced decay is genuinely important vs linear or random spacing — key for differentiating from M2-BERT.
+### The negative results are also valuable
 
-5. **Scale sensitivity.** All experiments use ~20M parameter models. At least one experiment at 100M+ would show whether findings hold.
+Two clean negative results worth documenting:
 
-### The negative result is also valuable
+1. **V2 ablation study:** Theoretically motivated components (cross-scale interference, covariance pooling) failed despite careful diagnosis and targeted fixes. The failure pattern — inert at short sequences, catastrophic at long sequences — suggests these mechanisms require either much larger model scale or fundamentally different formulations.
 
-The V2 ablation study is a clean negative result worth documenting: theoretically motivated components (cross-scale interference, covariance pooling) failed despite careful diagnosis and targeted fixes. The failure pattern — inert at short sequences, catastrophic at long sequences — suggests these mechanisms require either much larger model scale or fundamentally different formulations to be useful for embedding tasks.
+2. **Attentive pooling:** A reasonable hypothesis (mean pooling dilution causes the 8K < 2K gap) tested cleanly and shown to be a minor factor. The bottleneck is backbone capacity, not pooling.

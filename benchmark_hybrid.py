@@ -1077,7 +1077,7 @@ def main(
     skip_exp2: bool = False,
     skip_exp3: bool = False,
     skip_exp4: bool = False,
-    exp4_use_attentive: bool = True,
+    exp4_use_attentive: bool = False,
 ):
     """Run all hybrid experiments per the plan.
 
@@ -1275,8 +1275,8 @@ if __name__ == "__main__":
                         help="Skip Experiment 3 (local attention hybrid)")
     parser.add_argument("--skip-exp4", action="store_true",
                         help="Skip Experiment 4 (decay spacing ablation)")
-    parser.add_argument("--exp4-mean-pool", action="store_true",
-                        help="Use mean pooling for Experiment 4 (default: attentive)")
+    parser.add_argument("--exp4-attentive-pool", action="store_true",
+                        help="Use attentive pooling for Experiment 4 (default: mean)")
     args = parser.parse_args()
 
     main(
@@ -1290,5 +1290,5 @@ if __name__ == "__main__":
         skip_exp2=args.skip_exp2,
         skip_exp3=args.skip_exp3,
         skip_exp4=args.skip_exp4,
-        exp4_use_attentive=not args.exp4_mean_pool,
+        exp4_use_attentive=args.exp4_attentive_pool,
     )

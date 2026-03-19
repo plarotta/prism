@@ -1,0 +1,430 @@
+######################################################################
+# EXPERIMENT 1: Attentive Pooling vs Mean Pooling
+######################################################################
+
+============================================================
+  PRISM-Attentive (max_len=2048)
+============================================================
+  Parameters: 19,193,472
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training PRISM-Attentive (7000 steps, max_len=2048, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [PRISM-Attentive] Step 100/7000  loss=1.7165  (22.0s)
+  [PRISM-Attentive] Step 200/7000  loss=1.3855  (43.8s)
+  [PRISM-Attentive] Step 300/7000  loss=1.2482  (64.6s)
+  [PRISM-Attentive] Step 400/7000  loss=1.1501  (85.1s)
+  [PRISM-Attentive] Step 500/7000  loss=1.0492  (105.6s)
+  [PRISM-Attentive] Step 600/7000  loss=0.9285  (126.1s)
+  [PRISM-Attentive] Step 700/7000  loss=0.8838  (146.5s)
+  [PRISM-Attentive] Step 800/7000  loss=0.7955  (167.0s)
+  [PRISM-Attentive] Step 900/7000  loss=0.7097  (187.6s)
+  [PRISM-Attentive] Step 1000/7000  loss=0.6449  (208.1s)
+
+  [PRISM-Attentive] Checkpoint eval at step 1000...
+  [PRISM-Attentive] Step 1000: avg nDCG@10=0.2531, loss=0.6449 (eval took 48s)
+  [PRISM-Attentive] Step 1100/7000  loss=0.6470  (276.5s)
+  [PRISM-Attentive] Step 1200/7000  loss=0.5893  (296.9s)
+  [PRISM-Attentive] Step 1300/7000  loss=0.5264  (317.2s)
+  [PRISM-Attentive] Step 1400/7000  loss=0.4761  (337.6s)
+  [PRISM-Attentive] Step 1500/7000  loss=0.4930  (358.3s)
+  [PRISM-Attentive] Step 1600/7000  loss=0.4337  (378.8s)
+  [PRISM-Attentive] Step 1700/7000  loss=0.4029  (399.3s)
+  [PRISM-Attentive] Step 1800/7000  loss=0.3569  (419.7s)
+  [PRISM-Attentive] Step 1900/7000  loss=0.3525  (440.2s)
+  [PRISM-Attentive] Step 2000/7000  loss=0.3329  (460.3s)
+
+  [PRISM-Attentive] Checkpoint eval at step 2000...
+  [PRISM-Attentive] Step 2000: avg nDCG@10=0.3942, loss=0.3329 (eval took 48s)
+  [PRISM-Attentive] Step 2100/7000  loss=0.3107  (528.6s)
+  [PRISM-Attentive] Step 2200/7000  loss=0.2809  (548.7s)
+  [PRISM-Attentive] Step 2300/7000  loss=0.2551  (568.9s)
+  [PRISM-Attentive] Step 2400/7000  loss=0.2392  (589.4s)
+  [PRISM-Attentive] Step 2500/7000  loss=0.2286  (610.0s)
+  [PRISM-Attentive] Step 2600/7000  loss=0.2483  (630.5s)
+  [PRISM-Attentive] Step 2700/7000  loss=0.1902  (650.9s)
+  [PRISM-Attentive] Step 2800/7000  loss=0.2059  (671.3s)
+  [PRISM-Attentive] Step 2900/7000  loss=0.2010  (692.0s)
+  [PRISM-Attentive] Step 3000/7000  loss=0.1476  (712.4s)
+
+  [PRISM-Attentive] Checkpoint eval at step 3000...
+  [PRISM-Attentive] Step 3000: avg nDCG@10=0.4564, loss=0.1476 (eval took 48s)
+  [PRISM-Attentive] Step 3100/7000  loss=0.1583  (781.0s)
+  [PRISM-Attentive] Step 3200/7000  loss=0.1432  (801.5s)
+  [PRISM-Attentive] Step 3300/7000  loss=0.1456  (822.0s)
+  [PRISM-Attentive] Step 3400/7000  loss=0.1274  (842.4s)
+  [PRISM-Attentive] Step 3500/7000  loss=0.1564  (862.8s)
+  [PRISM-Attentive] Step 3600/7000  loss=0.0952  (883.2s)
+  [PRISM-Attentive] Step 3700/7000  loss=0.1200  (903.6s)
+  [PRISM-Attentive] Step 3800/7000  loss=0.1011  (924.1s)
+  [PRISM-Attentive] Step 3900/7000  loss=0.1162  (944.4s)
+  [PRISM-Attentive] Step 4000/7000  loss=0.0968  (964.9s)
+
+  [PRISM-Attentive] Checkpoint eval at step 4000...
+  [PRISM-Attentive] Step 4000: avg nDCG@10=0.5842, loss=0.0968 (eval took 48s)
+  [PRISM-Attentive] Step 4100/7000  loss=0.0902  (1033.2s)
+  [PRISM-Attentive] Step 4200/7000  loss=0.0915  (1053.6s)
+  [PRISM-Attentive] Step 4300/7000  loss=0.0810  (1074.0s)
+  [PRISM-Attentive] Step 4400/7000  loss=0.0768  (1094.3s)
+  [PRISM-Attentive] Step 4500/7000  loss=0.0790  (1114.7s)
+  [PRISM-Attentive] Step 4600/7000  loss=0.0816  (1135.1s)
+  [PRISM-Attentive] Step 4700/7000  loss=0.0674  (1155.5s)
+  [PRISM-Attentive] Step 4800/7000  loss=0.0627  (1176.0s)
+  [PRISM-Attentive] Step 4900/7000  loss=0.0676  (1196.6s)
+  [PRISM-Attentive] Step 5000/7000  loss=0.0646  (1217.0s)
+
+  [PRISM-Attentive] Checkpoint eval at step 5000...
+  [PRISM-Attentive] Step 5000: avg nDCG@10=0.6775, loss=0.0646 (eval took 48s)
+  [PRISM-Attentive] Step 5100/7000  loss=0.0467  (1285.3s)
+  [PRISM-Attentive] Step 5200/7000  loss=0.0476  (1305.6s)
+  [PRISM-Attentive] Step 5300/7000  loss=0.0596  (1326.1s)
+  [PRISM-Attentive] Step 5400/7000  loss=0.0645  (1346.2s)
+  [PRISM-Attentive] Step 5500/7000  loss=0.0620  (1366.3s)
+  [PRISM-Attentive] Step 5600/7000  loss=0.0527  (1386.7s)
+  [PRISM-Attentive] Step 5700/7000  loss=0.0573  (1407.1s)
+  [PRISM-Attentive] Step 5800/7000  loss=0.0425  (1427.5s)
+  [PRISM-Attentive] Step 5900/7000  loss=0.0562  (1447.8s)
+  [PRISM-Attentive] Step 6000/7000  loss=0.0446  (1467.9s)
+
+  [PRISM-Attentive] Checkpoint eval at step 6000...
+  [PRISM-Attentive] Step 6000: avg nDCG@10=0.7306, loss=0.0446 (eval took 48s)
+  [PRISM-Attentive] Step 6100/7000  loss=0.0421  (1535.9s)
+  [PRISM-Attentive] Step 6200/7000  loss=0.0515  (1555.9s)
+  [PRISM-Attentive] Step 6300/7000  loss=0.0386  (1576.0s)
+  [PRISM-Attentive] Step 6400/7000  loss=0.0440  (1596.1s)
+  [PRISM-Attentive] Step 6500/7000  loss=0.0420  (1616.2s)
+  [PRISM-Attentive] Step 6600/7000  loss=0.0338  (1636.3s)
+  [PRISM-Attentive] Step 6700/7000  loss=0.0412  (1656.3s)
+  [PRISM-Attentive] Step 6800/7000  loss=0.0346  (1676.5s)
+  [PRISM-Attentive] Step 6900/7000  loss=0.0361  (1696.9s)
+  [PRISM-Attentive] Step 7000/7000  loss=0.0391  (1717.4s)
+
+  [PRISM-Attentive] Checkpoint eval at step 7000...
+  [PRISM-Attentive] Step 7000: avg nDCG@10=0.7526, loss=0.0391 (eval took 48s)
+  [PRISM-Attentive] Training complete in 1765.3s
+
+  PRISM-Attentive avg nDCG@10: 0.7526 (loss=0.0391, 1765s)
+
+============================================================
+  PRISM-Attentive (max_len=8192)
+============================================================
+  Parameters: 21,552,768
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training PRISM-Attentive (7000 steps, max_len=8192, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [PRISM-Attentive] Step 100/7000  loss=1.8224  (71.3s)
+  [PRISM-Attentive] Step 200/7000  loss=1.4184  (142.6s)
+  [PRISM-Attentive] Step 300/7000  loss=1.3141  (213.8s)
+  [PRISM-Attentive] Step 400/7000  loss=1.2668  (285.1s)
+  [PRISM-Attentive] Step 500/7000  loss=1.1986  (356.3s)
+  [PRISM-Attentive] Step 600/7000  loss=1.0664  (427.5s)
+  [PRISM-Attentive] Step 700/7000  loss=0.9620  (498.7s)
+  [PRISM-Attentive] Step 800/7000  loss=0.8706  (569.9s)
+  [PRISM-Attentive] Step 900/7000  loss=0.8458  (641.2s)
+  [PRISM-Attentive] Step 1000/7000  loss=0.7669  (712.4s)
+
+  [PRISM-Attentive] Checkpoint eval at step 1000...
+  [PRISM-Attentive] Step 1000: avg nDCG@10=0.1640, loss=0.7669 (eval took 243s)
+  [PRISM-Attentive] Step 1100/7000  loss=0.7010  (1026.9s)
+  [PRISM-Attentive] Step 1200/7000  loss=0.6798  (1098.2s)
+  [PRISM-Attentive] Step 1300/7000  loss=0.6453  (1169.4s)
+  [PRISM-Attentive] Step 1400/7000  loss=0.5536  (1240.6s)
+  [PRISM-Attentive] Step 1500/7000  loss=0.5679  (1311.9s)
+  [PRISM-Attentive] Step 1600/7000  loss=0.5089  (1383.1s)
+  [PRISM-Attentive] Step 1700/7000  loss=0.4622  (1454.3s)
+  [PRISM-Attentive] Step 1800/7000  loss=0.4429  (1525.6s)
+  [PRISM-Attentive] Step 1900/7000  loss=0.4102  (1596.8s)
+  [PRISM-Attentive] Step 2000/7000  loss=0.3978  (1668.0s)
+
+  [PRISM-Attentive] Checkpoint eval at step 2000...
+  [PRISM-Attentive] Step 2000: avg nDCG@10=0.2751, loss=0.3978 (eval took 243s)
+  [PRISM-Attentive] Step 2100/7000  loss=0.3366  (1982.6s)
+  [PRISM-Attentive] Step 2200/7000  loss=0.3415  (2053.8s)
+  [PRISM-Attentive] Step 2300/7000  loss=0.3247  (2125.1s)
+  [PRISM-Attentive] Step 2400/7000  loss=0.3110  (2196.3s)
+  [PRISM-Attentive] Step 2500/7000  loss=0.2825  (2267.6s)
+  [PRISM-Attentive] Step 2600/7000  loss=0.2856  (2338.9s)
+  [PRISM-Attentive] Step 2700/7000  loss=0.2461  (2410.2s)
+  [PRISM-Attentive] Step 2800/7000  loss=0.2296  (2481.5s)
+  [PRISM-Attentive] Step 2900/7000  loss=0.2392  (2552.7s)
+  [PRISM-Attentive] Step 3000/7000  loss=0.2041  (2624.0s)
+  [PRISM-Attentive] Checkpoint eval at step 3000...
+  [PRISM-Attentive] Step 3000: avg nDCG@10=0.4082, loss=0.2041 (eval took 243s)
+  [PRISM-Attentive] Step 3100/7000  loss=0.2089  (2938.5s)
+  [PRISM-Attentive] Step 3200/7000  loss=0.1826  (3009.8s)
+  [PRISM-Attentive] Step 3300/7000  loss=0.1699  (3081.0s)
+  [PRISM-Attentive] Step 3400/7000  loss=0.1739  (3152.3s)
+  [PRISM-Attentive] Step 3500/7000  loss=0.1725  (3223.5s)
+  [PRISM-Attentive] Step 3600/7000  loss=0.1353  (3294.7s)
+  [PRISM-Attentive] Step 3700/7000  loss=0.1449  (3365.9s)
+  [PRISM-Attentive] Step 3800/7000  loss=0.1148  (3437.1s)
+  [PRISM-Attentive] Step 3900/7000  loss=0.1566  (3508.3s)
+  [PRISM-Attentive] Step 4000/7000  loss=0.1350  (3579.5s)
+
+  [PRISM-Attentive] Checkpoint eval at step 4000...
+  [PRISM-Attentive] Step 4000: avg nDCG@10=0.5183, loss=0.1350 (eval took 243s)
+  [PRISM-Attentive] Step 4100/7000  loss=0.1076  (3893.9s)
+  [PRISM-Attentive] Step 4200/7000  loss=0.1017  (3965.1s)
+  [PRISM-Attentive] Step 4300/7000  loss=0.1162  (4036.3s)
+  [PRISM-Attentive] Step 4400/7000  loss=0.0992  (4107.6s)
+  [PRISM-Attentive] Step 4500/7000  loss=0.1033  (4178.8s)
+  [PRISM-Attentive] Step 4600/7000  loss=0.0842  (4250.1s)
+  [PRISM-Attentive] Step 4700/7000  loss=0.0999  (4321.3s)
+  [PRISM-Attentive] Step 4800/7000  loss=0.0823  (4392.5s)
+  [PRISM-Attentive] Step 4900/7000  loss=0.0675  (4463.7s)
+  [PRISM-Attentive] Step 5000/7000  loss=0.0769  (4534.9s)
+
+  [PRISM-Attentive] Checkpoint eval at step 5000...
+   [PRISM-Attentive] Step 5000: avg nDCG@10=0.6110, loss=0.0769 (eval took 243s)
+  [PRISM-Attentive] Step 5100/7000  loss=0.0641  (4849.4s)
+  [PRISM-Attentive] Step 5200/7000  loss=0.0739  (4920.7s)
+  [PRISM-Attentive] Step 5300/7000  loss=0.0629  (4992.0s)
+  [PRISM-Attentive] Step 5400/7000  loss=0.0897  (5063.2s)
+  [PRISM-Attentive] Step 5500/7000  loss=0.0587  (5134.5s)
+  [PRISM-Attentive] Step 5600/7000  loss=0.0741  (5205.8s)
+  [PRISM-Attentive] Step 5700/7000  loss=0.0633  (5277.0s)
+  [PRISM-Attentive] Step 5800/7000  loss=0.0644  (5348.2s)
+  [PRISM-Attentive] Step 5900/7000  loss=0.0610  (5419.5s)
+  [PRISM-Attentive] Step 6000/7000  loss=0.0628  (5490.8s)
+
+  [PRISM-Attentive] Checkpoint eval at step 6000...
+  [PRISM-Attentive] Step 6000: avg nDCG@10=0.6729, loss=0.0628 (eval took 243s)
+  [PRISM-Attentive] Step 6100/7000  loss=0.0599  (5805.5s)
+  [PRISM-Attentive] Step 6200/7000  loss=0.0611  (5876.7s)
+  [PRISM-Attentive] Step 6300/7000  loss=0.0597  (5947.9s)
+  [PRISM-Attentive] Step 6400/7000  loss=0.0597  (6019.1s)
+   [PRISM-Attentive] Step 6500/7000  loss=0.0576  (6090.2s)
+  [PRISM-Attentive] Step 6600/7000  loss=0.0420  (6161.4s)
+  [PRISM-Attentive] Step 6700/7000  loss=0.0576  (6232.6s)
+  [PRISM-Attentive] Step 6800/7000  loss=0.0413  (6303.8s)
+  [PRISM-Attentive] Step 6900/7000  loss=0.0537  (6375.0s)
+  [PRISM-Attentive] Step 7000/7000  loss=0.0479  (6446.2s)
+
+  [PRISM-Attentive] Checkpoint eval at step 7000...
+  [PRISM-Attentive] Step 7000: avg nDCG@10=0.6922, loss=0.0479 (eval took 243s)
+  [PRISM-Attentive] Training complete in 6689.4s
+
+  PRISM-Attentive avg nDCG@10: 0.6922 (loss=0.0479, 6689s)
+
+============================================================
+  PRISM-MeanPool (max_len=2048)
+============================================================
+  Parameters: 19,193,088
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training PRISM-MeanPool (7000 steps, max_len=2048, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [PRISM-MeanPool] Step 100/7000  loss=1.7213  (20.4s)
+  [PRISM-MeanPool] Step 200/7000  loss=1.3754  (40.7s)
+  [PRISM-MeanPool] Step 300/7000  loss=1.2475  (61.0s)
+  [PRISM-MeanPool] Step 400/7000  loss=1.1237  (81.3s)
+  [PRISM-MeanPool] Step 500/7000  loss=1.0753  (101.6s)
+  [PRISM-MeanPool] Step 600/7000  loss=0.9445  (121.9s)
+  [PRISM-MeanPool] Step 700/7000  loss=0.8750  (142.0s)
+  [PRISM-MeanPool] Step 800/7000  loss=0.7713  (162.3s)
+  [PRISM-MeanPool] Step 900/7000  loss=0.7524  (182.5s)
+  [PRISM-MeanPool] Step 1000/7000  loss=0.6892  (202.6s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 1000...
+  [PRISM-MeanPool] Step 1000: avg nDCG@10=0.2184, loss=0.6892 (eval took 48s)
+  [PRISM-MeanPool] Step 1100/7000  loss=0.6290  (270.7s)
+  [PRISM-MeanPool] Step 1200/7000  loss=0.5749  (290.7s)
+  [PRISM-MeanPool] Step 1300/7000  loss=0.5376  (310.8s)
+  [PRISM-MeanPool] Step 1400/7000  loss=0.4546  (331.0s)
+  [PRISM-MeanPool] Step 1500/7000  loss=0.4755  (351.4s)
+  [PRISM-MeanPool] Step 1600/7000  loss=0.4440  (371.7s)
+  [PRISM-MeanPool] Step 1700/7000  loss=0.3907  (392.0s)
+  [PRISM-MeanPool] Step 1800/7000  loss=0.3520  (412.4s)
+  [PRISM-MeanPool] Step 1900/7000  loss=0.3732  (432.7s)
+  [PRISM-MeanPool] Step 2000/7000  loss=0.3288  (453.2s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 2000...
+  [PRISM-MeanPool] Step 2000: avg nDCG@10=0.3898, loss=0.3288 (eval took 48s)
+  [PRISM-MeanPool] Step 2100/7000  loss=0.2980  (521.5s)
+  [PRISM-MeanPool] Step 2200/7000  loss=0.2701  (541.9s)
+  [PRISM-MeanPool] Step 2300/7000  loss=0.2502  (562.3s)
+  [PRISM-MeanPool] Step 2400/7000  loss=0.2734  (582.6s)
+  [PRISM-MeanPool] Step 2500/7000  loss=0.2533  (603.0s)
+  [PRISM-MeanPool] Step 2600/7000  loss=0.2461  (623.3s)
+  [PRISM-MeanPool] Step 2700/7000  loss=0.2022  (643.4s)
+  [PRISM-MeanPool] Step 2800/7000  loss=0.1989  (663.8s)
+  [PRISM-MeanPool] Step 2900/7000  loss=0.1980  (684.1s)
+  [PRISM-MeanPool] Step 3000/7000  loss=0.1532  (704.5s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 3000...
+  [PRISM-MeanPool] Step 3000: avg nDCG@10=0.5125, loss=0.1532 (eval took 48s)
+  [PRISM-MeanPool] Step 3100/7000  loss=0.1614  (772.8s)
+  [PRISM-MeanPool] Step 3200/7000  loss=0.1411  (793.2s)
+  [PRISM-MeanPool] Step 3300/7000  loss=0.1620  (813.5s)
+  [PRISM-MeanPool] Step 3400/7000  loss=0.1343  (833.9s)
+  [PRISM-MeanPool] Step 3500/7000  loss=0.1428  (854.1s)
+  [PRISM-MeanPool] Step 3600/7000  loss=0.1177  (874.4s)
+  [PRISM-MeanPool] Step 3700/7000  loss=0.1239  (894.7s)
+  [PRISM-MeanPool] Step 3800/7000  loss=0.0941  (915.0s)
+  [PRISM-MeanPool] Step 3900/7000  loss=0.1138  (935.4s)
+  [PRISM-MeanPool] Step 4000/7000  loss=0.1108  (955.7s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 4000...
+  [PRISM-MeanPool] Step 4000: avg nDCG@10=0.6014, loss=0.1108 (eval took 48s)
+  [PRISM-MeanPool] Step 4100/7000  loss=0.0864  (1023.8s)
+  [PRISM-MeanPool] Step 4200/7000  loss=0.0825  (1043.9s)
+  [PRISM-MeanPool] Step 4300/7000  loss=0.0890  (1063.9s)
+  [PRISM-MeanPool] Step 4400/7000  loss=0.0729  (1084.0s)
+  [PRISM-MeanPool] Step 4500/7000  loss=0.0815  (1104.0s)
+  [PRISM-MeanPool] Step 4600/7000  loss=0.0748  (1124.1s)
+  [PRISM-MeanPool] Step 4700/7000  loss=0.0757  (1144.2s)
+  [PRISM-MeanPool] Step 4800/7000  loss=0.0800  (1164.2s)
+  [PRISM-MeanPool] Step 4900/7000  loss=0.0586  (1184.3s)
+  [PRISM-MeanPool] Step 5000/7000  loss=0.0626  (1204.5s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 5000...
+  [PRISM-MeanPool] Step 5000: avg nDCG@10=0.7043, loss=0.0626 (eval took 48s)
+  [PRISM-MeanPool] Step 5100/7000  loss=0.0590  (1272.5s)
+  [PRISM-MeanPool] Step 5200/7000  loss=0.0532  (1292.6s)
+  [PRISM-MeanPool] Step 5300/7000  loss=0.0468  (1312.7s)
+  [PRISM-MeanPool] Step 5400/7000  loss=0.0722  (1332.7s)
+  [PRISM-MeanPool] Step 5500/7000  loss=0.0467  (1352.8s)
+  [PRISM-MeanPool] Step 5600/7000  loss=0.0508  (1372.8s)
+  [PRISM-MeanPool] Step 5700/7000  loss=0.0548  (1392.9s)
+  [PRISM-MeanPool] Step 5800/7000  loss=0.0388  (1413.1s)
+  [PRISM-MeanPool] Step 5900/7000  loss=0.0490  (1433.1s)
+  [PRISM-MeanPool] Step 6000/7000  loss=0.0538  (1453.2s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 6000...
+  [PRISM-MeanPool] Step 6000: avg nDCG@10=0.7524, loss=0.0538 (eval took 48s)
+  [PRISM-MeanPool] Step 6100/7000  loss=0.0453  (1521.4s)
+  [PRISM-MeanPool] Step 6200/7000  loss=0.0488  (1541.7s)
+  [PRISM-MeanPool] Step 6300/7000  loss=0.0427  (1562.1s)
+  [PRISM-MeanPool] Step 6400/7000  loss=0.0463  (1582.4s)
+  [PRISM-MeanPool] Step 6500/7000  loss=0.0379  (1602.7s)
+  [PRISM-MeanPool] Step 6600/7000  loss=0.0344  (1623.1s)
+  [PRISM-MeanPool] Step 6700/7000  loss=0.0461  (1643.4s)
+  [PRISM-MeanPool] Step 6800/7000  loss=0.0401  (1663.8s)
+  [PRISM-MeanPool] Step 6900/7000  loss=0.0356  (1684.1s)
+  [PRISM-MeanPool] Step 7000/7000  loss=0.0315  (1704.4s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 7000...
+  [PRISM-MeanPool] Step 7000: avg nDCG@10=0.7700, loss=0.0315 (eval took 48s)
+  [PRISM-MeanPool] Training complete in 1752.4s
+
+  PRISM-MeanPool avg nDCG@10: 0.7700 (loss=0.0315, 1752s)
+
+============================================================
+  PRISM-MeanPool (max_len=8192)
+============================================================
+  Parameters: 21,552,384
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16
+
+Training PRISM-MeanPool (7000 steps, max_len=8192, micro_batch=16, accum=1, effective_batch=16)
+  Checkpoint eval at steps: [1000, 2000, 3000, 4000, 5000, 6000, 7000]
+  [PRISM-MeanPool] Step 100/7000  loss=1.8065  (71.3s)
+  [PRISM-MeanPool] Step 200/7000  loss=1.3916  (142.4s)
+  [PRISM-MeanPool] Step 300/7000  loss=1.2938  (213.5s)
+  [PRISM-MeanPool] Step 400/7000  loss=1.2412  (284.6s)
+  [PRISM-MeanPool] Step 500/7000  loss=1.1545  (355.8s)
+  [PRISM-MeanPool] Step 600/7000  loss=1.0641  (427.0s)
+  [PRISM-MeanPool] Step 700/7000  loss=0.9626  (498.1s)
+  [PRISM-MeanPool] Step 800/7000  loss=0.8635  (569.2s)
+  [PRISM-MeanPool] Step 900/7000  loss=0.7993  (640.4s)
+  [PRISM-MeanPool] Step 1000/7000  loss=0.7540  (711.6s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 1000...
+  [PRISM-MeanPool] Step 1000: avg nDCG@10=0.1677, loss=0.7540 (eval took 243s)
+  [PRISM-MeanPool] Step 1100/7000  loss=0.6739  (1025.9s)
+  [PRISM-MeanPool] Step 1200/7000  loss=0.6691  (1097.0s)
+  [PRISM-MeanPool] Step 1300/7000  loss=0.6671  (1168.2s)
+  [PRISM-MeanPool] Step 1400/7000  loss=0.5541  (1239.3s)
+  [PRISM-MeanPool] Step 1500/7000  loss=0.5882  (1310.5s)
+  [PRISM-MeanPool] Step 1600/7000  loss=0.4803  (1381.6s)
+  [PRISM-MeanPool] Step 1700/7000  loss=0.4795  (1452.8s)
+  [PRISM-MeanPool] Step 1800/7000  loss=0.4328  (1523.9s)
+  [PRISM-MeanPool] Step 1900/7000  loss=0.4271  (1595.0s)
+  [PRISM-MeanPool] Step 2000/7000  loss=0.4065  (1666.2s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 2000...
+  [PRISM-MeanPool] Step 2000: avg nDCG@10=0.2783, loss=0.4065 (eval took 243s)
+  [PRISM-MeanPool] Step 2100/7000  loss=0.3773  (1980.6s)
+  [PRISM-MeanPool] Step 2200/7000  loss=0.3255  (2051.7s)
+  [PRISM-MeanPool] Step 2300/7000  loss=0.3239  (2122.8s)
+  [PRISM-MeanPool] Step 2400/7000  loss=0.3122  (2194.0s)
+  [PRISM-MeanPool] Step 2500/7000  loss=0.2917  (2265.1s)
+  [PRISM-MeanPool] Step 2600/7000  loss=0.2958  (2336.2s)
+  [PRISM-MeanPool] Step 2700/7000  loss=0.2437  (2407.3s)
+  [PRISM-MeanPool] Step 2800/7000  loss=0.2456  (2478.5s)
+  [PRISM-MeanPool] Step 2900/7000  loss=0.2516  (2549.6s)
+  [PRISM-MeanPool] Step 3000/7000  loss=0.1962  (2620.8s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 3000...
+^[  [PRISM-MeanPool] Step 3000: avg nDCG@10=0.3930, loss=0.1962 (eval took 243s)
+  [PRISM-MeanPool] Step 3100/7000  loss=0.2121  (2935.0s)
+  [PRISM-MeanPool] Step 3200/7000  loss=0.1783  (3006.2s)
+  [PRISM-MeanPool] Step 3300/7000  loss=0.1976  (3077.4s)
+  [PRISM-MeanPool] Step 3400/7000  loss=0.1810  (3148.6s)
+  [PRISM-MeanPool] Step 3500/7000  loss=0.1657  (3219.8s)
+  [PRISM-MeanPool] Step 3600/7000  loss=0.1536  (3291.0s)
+  [PRISM-MeanPool] Step 3700/7000  loss=0.1498  (3362.2s)
+  [PRISM-MeanPool] Step 3800/7000  loss=0.1327  (3433.4s)
+  [PRISM-MeanPool] Step 3900/7000  loss=0.1709  (3504.7s)
+  [PRISM-MeanPool] Step 4000/7000  loss=0.1313  (3576.2s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 4000...
+  [PRISM-MeanPool] Step 4000: avg nDCG@10=0.4835, loss=0.1313 (eval took 244s)
+  [PRISM-MeanPool] Step 4100/7000  loss=0.1077  (3891.4s)
+  [PRISM-MeanPool] Step 4200/7000  loss=0.1080  (3962.5s)
+  [PRISM-MeanPool] Step 4300/7000  loss=0.1035  (4033.7s)
+  [PRISM-MeanPool] Step 4400/7000  loss=0.1109  (4104.9s)
+  [PRISM-MeanPool] Step 4500/7000  loss=0.0981  (4176.0s)
+  [PRISM-MeanPool] Step 4600/7000  loss=0.0867  (4247.1s)
+  [PRISM-MeanPool] Step 4700/7000  loss=0.0965  (4318.2s)
+  [PRISM-MeanPool] Step 4800/7000  loss=0.0995  (4389.2s)
+  [PRISM-MeanPool] Step 4900/7000  loss=0.0626  (4460.3s)
+  [PRISM-MeanPool] Step 5000/7000  loss=0.0788  (4531.4s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 5000...
+  [PRISM-MeanPool] Step 5000: avg nDCG@10=0.5597, loss=0.0788 (eval took 243s)
+  [PRISM-MeanPool] Step 5100/7000  loss=0.0687  (4846.3s)
+  [PRISM-MeanPool] Step 5200/7000  loss=0.0744  (4917.7s)
+  [PRISM-MeanPool] Step 5300/7000  loss=0.0627  (4989.1s)
+  [PRISM-MeanPool] Step 5400/7000  loss=0.0741  (5060.4s)
+  [PRISM-MeanPool] Step 5500/7000  loss=0.0619  (5131.6s)
+  [PRISM-MeanPool] Step 5600/7000  loss=0.0662  (5202.8s)
+  [PRISM-MeanPool] Step 5700/7000  loss=0.0523  (5273.9s)
+  [PRISM-MeanPool] Step 5800/7000  loss=0.0548  (5345.0s)
+  [PRISM-MeanPool] Step 5900/7000  loss=0.0677  (5416.2s)
+  [PRISM-MeanPool] Step 6000/7000  loss=0.0715  (5487.3s)
+
+  [PRISM-MeanPool] Checkpoint eval at step 6000...
+  [PRISM-MeanPool] Step 6000: avg nDCG@10=0.6419, loss=0.0715 (eval took 243s)
+  [PRISM-MeanPool] Step 6100/7000  loss=0.0550  (5801.7s)
+  [PRISM-MeanPool] Step 6200/7000  loss=0.0596  (5873.1s)
+  [PRISM-MeanPool] Step 6300/7000  loss=0.0662  (5944.5s)
+  [PRISM-MeanPool] Step 6400/7000  loss=0.0591  (6015.7s)
+  [PRISM-MeanPool] Step 6500/7000  loss=0.0606  (6086.8s)
+  [PRISM-MeanPool] Step 6600/7000  loss=0.0464  (6158.0s)
+  [PRISM-MeanPool] Step 6700/7000  loss=0.0705  (6229.1s)
+  [PRISM-MeanPool] Step 6800/7000  loss=0.0529  (6300.3s)
+  [PRISM-MeanPool] Step 6900/7000  loss=0.0458  (6371.4s)
+  [PRISM-MeanPool] Step 7000/7000  loss=0.0465  (6442.4s)
+
+    [PRISM-MeanPool] Checkpoint eval at step 7000...
+  [PRISM-MeanPool] Step 7000: avg nDCG@10=0.6747, loss=0.0465 (eval took 243s)
+  [PRISM-MeanPool] Training complete in 6685.5s
+
+  PRISM-MeanPool avg nDCG@10: 0.6747 (loss=0.0465, 6685s)
+
+============================================================
+EXPERIMENT 1 RESULTS
+============================================================
+  Config                          Avg nDCG@10     Loss     Time
+  --------------------------------------------------------------
+  attentive @ 2048                     0.7526   0.0391    1765s
+  attentive @ 8192                     0.6922   0.0479    6689s
+  mean @ 2048                          0.7700   0.0315    1752s
+  mean @ 8192                          0.6747   0.0465    6685s
+
+  Primary: Attentive 8K (0.6922) vs Mean 8K (0.6747): PASS (delta=+0.0175)
+  Ideal:   Attentive 8K (0.6922) vs Mean 2K (0.7700): FAIL (delta=-0.0779)
+  Bonus:   Attentive 2K (0.7526) vs Mean 2K (0.7700): FAIL (delta=-0.0174)
+
+  Experiment 1 showed improvement -> running Experiment 2

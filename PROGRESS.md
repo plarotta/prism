@@ -263,55 +263,49 @@ are approximate values read from their paper.
 
 ---
 
-## Phase 6: Hybrid Architecture Experiments (ready to run)
+## Phase 6: Hybrid Architecture Experiments (in progress)
 
 Addressing the 8K < 2K gap identified in Phase 5. Mean pooling dilutes embeddings at long sequences by weighting all tokens equally — boilerplate and low-information sections drag down the average. At 2K, truncation accidentally keeps only the information-dense beginning. At 8K, the model sees full documents but can't distinguish signal from noise at the pooling stage.
 
-**Hypothesis:** Replace mean pooling with learned attentive pooling to let the model selectively weight informative positions while keeping the recurrence backbone unchanged.
+### Experiment 0: Improved Baselines (complete)
 
-New architecture components added to `prism.py`:
-- `AttentivePooling` — single learned query vector, softmax attention over token positions, weighted sum + projection + LayerNorm
-- `MultiHeadAttentivePooling` — K independent learned queries, concatenated and projected down
+Re-ran LoCoV1 baselines with LR sweep ([1e-4, 3e-4, 5e-4, 1e-3]) and 7000 steps (up from 5000). Checkpoint eval every 1000 steps.
 
-### Experiment 0: Improved Baselines
+| Model | max_len | Avg nDCG@10 | Loss | Train Time | Notes |
+|-------|---------|-------------|------|------------|-------|
+| PRISM-MeanPool | 2048 | **0.770** | 0.032 | 1754s | Best result overall |
+| Transformer | 2048 | 0.672 | 0.109 | 3631s | LR sweep fixed Phase 5's 0.194 |
+| PRISM-MeanPool | 8192 | 0.675 | 0.047 | 6661s | 8K < 2K gap persists (-9.5 pts) |
+| Transformer | 8192 | ~0.107 | 0.204 | discontinued | micro_batch=2, 5s/step, stalled |
 
-Re-run LoCoV1 baselines (PRISM-MeanPool + Transformer) with two improvements:
-- **LR sweep:** Test [1e-4, 3e-4, 5e-4, 1e-3] at 500 steps each, select best per model
-- **Checkpoint evaluation:** Evaluate all 12 tasks at intermediate steps (every 1000 steps) to track convergence
+Key finding: The Transformer's Phase 5 score (0.194) was due to a bad LR, not architecture. With tuned LR it reaches 0.672, but PRISM still wins by +9.8 points at 2K.
 
-### Experiment 1: Attentive Pooling
+### Experiment 1: Attentive Pooling (complete)
 
-| Run | Model | Pooling | max_len | Purpose |
-|-----|-------|---------|---------|---------|
-| 1a | PRISM | Attentive | 2048 | Does attentive pooling help or hurt at 2K? |
-| 1b | PRISM | Attentive | 8192 | Does attentive pooling fix the 8K degradation? |
+Replaced mean pooling with a single learned query vector (AttentivePooling). Tested at 2K and 8K.
 
-**Success criteria:** Run 1b > 0.578 (mean pool 8K). Ideal: Run 1b >= 0.689 (mean pool 2K).
+| Config | Avg nDCG@10 | Loss | Train Time |
+|--------|-------------|------|------------|
+| Attentive @ 2048 | 0.753 | 0.039 | 1765s |
+| Mean @ 2048 | **0.770** | 0.032 | 1752s |
+| Attentive @ 8192 | **0.692** | 0.048 | 6689s |
+| Mean @ 8192 | 0.675 | 0.047 | 6685s |
 
-### Experiment 2: Multi-Head Attentive Pooling (conditional on Exp 1)
+**Success criteria results:**
+- **Primary (Attentive 8K > Mean 8K): PASS** — +1.8 points (0.692 vs 0.675)
+- **Ideal (Attentive 8K >= Mean 2K): FAIL** — -7.8 points (0.692 vs 0.770)
+- **Bonus (Attentive 2K > Mean 2K): FAIL** — -1.7 points (0.753 vs 0.770)
 
-Only runs if Experiment 1 shows improvement. Tests K=4 and K=8 learned query heads at 8192.
+**Interpretation:** Attentive pooling provides a modest boost at 8K but slightly hurts at 2K. Mean pooling dilution is real but minor — the 8K < 2K gap is primarily a backbone capacity problem, not a pooling problem. The 384-dim hidden state cannot compress 8K tokens of real language well regardless of how you pool.
 
-### Experiment 3: Local Attention Hybrid (conditional)
+### Experiments 2 & 3: Skipped
 
-Inserts a sliding-window attention layer (w=256 or w=512) after recurrence layer 4, giving the model one opportunity for precise local token-level matching within the recurrence stack. O(n·w) — preserves linear scaling.
+Multi-head pooling (Exp 2) and local attention hybrid (Exp 3) skipped — the ~1.8 point delta from attentive pooling is too small to justify further pooling exploration. The bottleneck is in the recurrence backbone, not the pooling stage.
 
-Uses `micro_batch_cap` to prevent OOM from unfold-materialized windows:
-- w=256: micro_batch capped at 8
-- w=512: micro_batch capped at 4
-
-### Experiment 4: Decay Spacing Ablation (independent)
+### Experiment 4: Decay Spacing Ablation (pending)
 
 Tests whether geometric decay spacing is a meaningful inductive bias:
 - Geometric (current), Linear, Random fixed, All-slow (λ=0.99), All-fast (λ=0.1)
-
-### To Run
-
-```bash
-uv run python benchmark_hybrid.py                    # all experiments
-uv run python benchmark_hybrid.py --skip-exp0         # skip baselines
-uv run python benchmark_hybrid.py --skip-exp2 --skip-exp3  # just Exp 0, 1, 4
-```
 
 ---
 
