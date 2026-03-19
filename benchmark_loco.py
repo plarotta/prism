@@ -506,7 +506,7 @@ def run_phase_0(tokenizer, max_len=8192):
 def _get_gpu_mem_gb() -> float:
     """Detect available GPU memory in GB."""
     if torch.cuda.is_available():
-        total = torch.cuda.get_device_properties(0).total_mem / 1024**3
+        total = torch.cuda.get_device_properties(0).total_memory / 1024**3
         return total
     return 0.0
 
