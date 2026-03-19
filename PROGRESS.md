@@ -12,7 +12,7 @@ PRISM runs comfortably at micro_batch=16.
 > across 12 long-context retrieval tasks, while using a fraction of the memory.
 > The Transformer cannot even train at 8K tokens on a 95 GB GPU.
 
-**Next:** Re-run Transformer at 8192 with micro_batch=2 + gradient accumulation (OOM fix pushed).
+**Next:** Run hybrid experiments (`benchmark_hybrid.py`) — attentive pooling, multi-head pooling, local attention hybrid, and decay spacing ablation to address the 8K < 2K gap.
 
 ---
 
@@ -263,6 +263,58 @@ are approximate values read from their paper.
 
 ---
 
+## Phase 6: Hybrid Architecture Experiments (ready to run)
+
+Addressing the 8K < 2K gap identified in Phase 5. Mean pooling dilutes embeddings at long sequences by weighting all tokens equally — boilerplate and low-information sections drag down the average. At 2K, truncation accidentally keeps only the information-dense beginning. At 8K, the model sees full documents but can't distinguish signal from noise at the pooling stage.
+
+**Hypothesis:** Replace mean pooling with learned attentive pooling to let the model selectively weight informative positions while keeping the recurrence backbone unchanged.
+
+New architecture components added to `prism.py`:
+- `AttentivePooling` — single learned query vector, softmax attention over token positions, weighted sum + projection + LayerNorm
+- `MultiHeadAttentivePooling` — K independent learned queries, concatenated and projected down
+
+### Experiment 0: Improved Baselines
+
+Re-run LoCoV1 baselines (PRISM-MeanPool + Transformer) with two improvements:
+- **LR sweep:** Test [1e-4, 3e-4, 5e-4, 1e-3] at 500 steps each, select best per model
+- **Checkpoint evaluation:** Evaluate all 12 tasks at intermediate steps (every 1000 steps) to track convergence
+
+### Experiment 1: Attentive Pooling
+
+| Run | Model | Pooling | max_len | Purpose |
+|-----|-------|---------|---------|---------|
+| 1a | PRISM | Attentive | 2048 | Does attentive pooling help or hurt at 2K? |
+| 1b | PRISM | Attentive | 8192 | Does attentive pooling fix the 8K degradation? |
+
+**Success criteria:** Run 1b > 0.578 (mean pool 8K). Ideal: Run 1b >= 0.689 (mean pool 2K).
+
+### Experiment 2: Multi-Head Attentive Pooling (conditional on Exp 1)
+
+Only runs if Experiment 1 shows improvement. Tests K=4 and K=8 learned query heads at 8192.
+
+### Experiment 3: Local Attention Hybrid (conditional)
+
+Inserts a sliding-window attention layer (w=256 or w=512) after recurrence layer 4, giving the model one opportunity for precise local token-level matching within the recurrence stack. O(n·w) — preserves linear scaling.
+
+Uses `micro_batch_cap` to prevent OOM from unfold-materialized windows:
+- w=256: micro_batch capped at 8
+- w=512: micro_batch capped at 4
+
+### Experiment 4: Decay Spacing Ablation (independent)
+
+Tests whether geometric decay spacing is a meaningful inductive bias:
+- Geometric (current), Linear, Random fixed, All-slow (λ=0.99), All-fast (λ=0.1)
+
+### To Run
+
+```bash
+uv run python benchmark_hybrid.py                    # all experiments
+uv run python benchmark_hybrid.py --skip-exp0         # skip baselines
+uv run python benchmark_hybrid.py --skip-exp2 --skip-exp3  # just Exp 0, 1, 4
+```
+
+---
+
 ## File Inventory
 
 ```
@@ -275,6 +327,8 @@ prism/
 ├── benchmark_v2_ablations.py   # V2 targeted fixes ablation (A-G)
 ├── benchmark_real_data.py      # Real-data evaluation (NLI, STS-B, long-doc)
 ├── benchmark_loco.py           # LoCoV1 12-task long-context retrieval benchmark
+├── benchmark_hybrid.py         # Phase 6: attentive pooling, local attn, decay ablations
+├── hydbrid_arch_plan.md        # Hybrid experiment plan (Experiments 1-4)
 ├── investigate.py              # Phase 2: alpha autopsy + warm init + long-seq
 ├── run_all.py                  # Phase 1 runner (scaling + quality + ablations)
 ├── run_all_v2.py               # Master runner (everything: scaling → real data)

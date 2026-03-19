@@ -279,6 +279,47 @@ PRISM at 2048 outperforms M2-BERT-80M-8K despite 4x fewer parameters and no pret
 - Whether pretraining (MLM on C4/Wikipedia) would close the 2K→8K gap for PRISM and make the 8K results competitive with or better than 2K
 - Whether the LoCoV1 results would hold under a zero-shot evaluation protocol (pretrain + fine-tune on separate retrieval data, evaluate on LoCoV1)
 - Whether the novel components might help at larger scale where the model has more capacity to learn cross-channel interactions
+- **Whether attentive pooling fixes the 8K < 2K degradation** (Phase 6, ready to run)
+- **Whether geometric decay spacing is a meaningful inductive bias vs linear/random** (Phase 6, ready to run)
+
+## 7b. Phase 6: Hybrid Architecture Experiments (ready to run)
+
+### The 8K < 2K Problem
+
+PRISM-Simplified at 8K (0.578) scores lower than at 2K (0.689) across all 12 LoCoV1 tasks. Diagnosis: mean pooling averages over all token positions equally, which dilutes the embedding when documents contain boilerplate, repetitive language, or low-information sections. At 2K, truncation accidentally helps by keeping only the information-dense beginning. At 8K, the model sees the full document but can't distinguish signal from noise at the pooling stage.
+
+### Proposed Fix: Attentive Pooling
+
+Replace mean pooling with a learned attentive pooling head — a minimal intervention that lets the model selectively weight informative positions while keeping the entire recurrence backbone unchanged.
+
+```
+AttentivePooling:
+  - Learned query vector q ∈ R^d (single parameter, not input-dependent)
+  - Attention scores: a_t = softmax(q · f_t / sqrt(d))
+  - Weighted sum: e = Σ a_t * f_t
+  - Project + normalize: embedding = LayerNorm(Linear(e))
+```
+
+Adds ~d parameters (384 for PRISM-Small) — negligible. Uses a learned query rather than input-dependent (the original attentive covariance pooling used the slowest channel's last hidden state, which couples pooling to a specific channel and has failure modes from low-quality query states).
+
+### Experiment Design
+
+Five experiment groups implemented in `benchmark_hybrid.py`:
+
+| Experiment | What | Conditional On |
+|------------|------|----------------|
+| **0: Improved Baselines** | PRISM-MeanPool + Transformer with LR sweep and checkpoint eval | — |
+| **1: Attentive Pooling** | Single-query attentive pooling at 2K and 8K | — |
+| **2: Multi-Head Pooling** | K=4, K=8 learned queries at 8K | Exp 1 shows improvement |
+| **3: Local Attention Hybrid** | Sliding-window attention (w=256, w=512) after recurrence layer 4 | Gap remains after Exp 1 |
+| **4: Decay Spacing** | Geometric vs linear vs random vs all-slow vs all-fast | Independent |
+
+### What Each Outcome Would Mean
+
+- **Attentive pooling fixes 8K:** Mean pooling dilution was the bottleneck; the recurrence backbone already captures useful long-range information that mean pooling was averaging away.
+- **Both 2K and 8K improve:** Attentive pooling is strictly better than mean pooling. The earlier ablation where mean pooling beat covariance pooling was about the covariance sketch, not attention at the pooling stage.
+- **Neither improves:** The bottleneck is in the recurrence backbone's capacity (384-dim hidden state can't compress 8K tokens regardless of pooling). Points toward wider or more channels.
+- **Geometric decay beats all spacing variants:** The log-spaced frequency decomposition is a genuine inductive bias — the core differentiator from M2-BERT.
 
 ## 8. Current State and Next Steps
 
@@ -301,17 +342,34 @@ No interference. No covariance pooling. The contribution is empirical:
 
 > A bidirectional multi-channel state-space encoder with fixed geometric decay rates beats a parameter-matched Transformer on embedding quality at sequences beyond ~256 tokens, with O(n) scaling, 2x+ inference speedup at 2K+ tokens, and order-of-magnitude memory savings.
 
+**Potential upgrade (Phase 6, pending results):** Replace mean pooling with learned attentive pooling. If successful, the architecture becomes:
+
+```
+PRISM-Attentive = Embedding
+                → Frequency-stratified projection (C channels)
+                → Fixed-rate gated linear recurrence (geometric decay rates)
+                → Bidirectional gated fusion
+                → Attentive pooling (learned query)
+                → LayerNorm
+```
+
+### Immediate next step
+
+Run the Phase 6 hybrid experiments (`uv run python benchmark_hybrid.py`). These directly address the 8K < 2K gap — the most important open question for the PRISM narrative. If attentive pooling fixes the gap, the story becomes: "PRISM scales linearly *and* improves with context length."
+
 ### What a paper would need
 
 The LoCoV1 results substantially strengthen the case. Remaining gaps:
 
-1. **Fair comparison with M2-BERT.** Current LoCoV1 results are strong but the training protocol differs (we train on LoCoV1 pairs; M2-BERT is evaluated zero-shot). Implementing the pretrain → fine-tune → zero-shot eval pipeline from Plan Loco Phase 2 would make this comparison rigorous.
+1. **Resolve the 8K < 2K paradox.** Phase 6 experiments (attentive pooling, local attention) are designed to address this directly. If they succeed, the paper narrative becomes much cleaner.
 
-2. **Resolve the 8K < 2K paradox.** PRISM-2048 outperforms PRISM-8192. Need to determine whether this is a training budget issue (5K steps insufficient for 8K) or a fundamental property. More training steps and/or pretraining would answer this.
+2. **Fair comparison with M2-BERT.** Current LoCoV1 results are strong but the training protocol differs (we train on LoCoV1 pairs; M2-BERT is evaluated zero-shot). Implementing the pretrain → fine-tune → zero-shot eval pipeline from Plan Loco Phase 2 would make this comparison rigorous.
 
-3. **Complete Transformer at 8K.** With the OOM fix (micro_batch=2, grad_accum=8), the Transformer should be able to train at 8192. This result — even if poor — is important for the narrative.
+3. **Complete Transformer at 8K.** Experiment 0 in `benchmark_hybrid.py` re-runs the Transformer with gradient accumulation (micro_batch=2, grad_accum=8). Even a poor result is important for the narrative.
 
-4. **Scale sensitivity.** All experiments use ~20M parameter models. At least one experiment at 100M+ would show whether findings hold.
+4. **Validate geometric decay as inductive bias.** Experiment 4 tests whether the log-spaced decay is genuinely important vs linear or random spacing — key for differentiating from M2-BERT.
+
+5. **Scale sensitivity.** All experiments use ~20M parameter models. At least one experiment at 100M+ would show whether findings hold.
 
 ### The negative result is also valuable
 
