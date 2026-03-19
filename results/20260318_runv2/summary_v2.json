@@ -1,0 +1,207 @@
+{
+  "device": "cuda",
+  "total_time_min": 163.89243877841665,
+  "scaling": {
+    "inference_speedups": {
+      "64": 0.09774215549497242,
+      "128": 0.0861764763503405,
+      "256": 0.1436271851139905,
+      "512": 0.2514063746529452,
+      "1024": 0.5176702454456642,
+      "2048": 1.4379974471743957,
+      "4096": 2.1952091580759934
+    },
+    "transformer_oom_at": [
+      4096,
+      8192,
+      16384
+    ]
+  },
+  "quality": {
+    "prism_mrr": 0.943044049428832,
+    "transformer_mrr": 0.983
+  },
+  "ablations": {
+    "A: No Interference": -0.006473536097769572,
+    "B: Learned Decay": -0.00011873381667282246,
+    "C: Additive (not bilinear)": 0.0009634782608695103,
+    "D: Mean Pooling": 0.023843188405797022
+  },
+  "v2_ablations": {
+    "A: Interf. LayerNorm": {
+      "mrr": 0.6934962206358688,
+      "vs_base": -0.05016537124495435,
+      "vs_simple": -0.29485933491968686
+    },
+    "B: Interf. 1/\u221ad_c": {
+      "mrr": 0.7631295136488618,
+      "vs_base": 0.019467921768038687,
+      "vs_simple": -0.22522604190669382
+    },
+    "C: Interf. \u03b1=1/(C-1)": {
+      "mrr": 0.7025790595941971,
+      "vs_base": -0.04108253228662606,
+      "vs_simple": -0.28577649596135857
+    },
+    "D: Interf. Gate": {
+      "mrr": 0.7359104607184994,
+      "vs_base": -0.007751131162323732,
+      "vs_simple": -0.25244509483705624
+    },
+    "E: Cov LayerNorm": {
+      "mrr": 0.832442410484289,
+      "vs_base": 0.08878081860346587,
+      "vs_simple": -0.15591314507126663
+    },
+    "F: Cov Rank8+Proj": {
+      "mrr": 0.6099755581700427,
+      "vs_base": -0.13368603371078047,
+      "vs_simple": -0.378379997385513
+    },
+    "G: All V2 Fixes": {
+      "mrr": 0.7346613087709225,
+      "vs_base": -0.009000283109900642,
+      "vs_simple": -0.25369424678463315
+    }
+  },
+  "real_data": {
+    "phase_3a": {
+      "PRISM-Simplified": {
+        "sts_spearman": 0.5893055695678127,
+        "train_time": 468.450906590002,
+        "params": 21552384,
+        "final_loss": 0.44001871332526205
+      },
+      "Transformer": {
+        "sts_spearman": 0.5593122584395479,
+        "train_time": 120.63344740400134,
+        "params": 22119936,
+        "final_loss": 0.6943628486990928
+      }
+    },
+    "phase_3b": {
+      "128": {
+        "PRISM-Simplified": {
+          "train_time": 502.49246234300153,
+          "final_loss": 0.09188192105619236,
+          "params": 21552384,
+          "mrr": 0.24064620945398166,
+          "recall@1": 0.005,
+          "recall@5": 0.495,
+          "recall@10": 0.7,
+          "n_queries": 200,
+          "corpus_size": 2000,
+          "seq_len": 128,
+          "throughput_seq_per_sec": 910.5966388352159,
+          "latency_ms": 35.14179455014528
+        },
+        "Transformer": {
+          "train_time": 94.70604469399768,
+          "final_loss": 0.9006643858551979,
+          "params": 22119936,
+          "mrr": 0.09579357725979126,
+          "recall@1": 0.0,
+          "recall@5": 0.18,
+          "recall@10": 0.27,
+          "n_queries": 200,
+          "corpus_size": 2000,
+          "seq_len": 128,
+          "throughput_seq_per_sec": 4480.855910636429,
+          "latency_ms": 7.141492750088219
+        }
+      },
+      "256": {
+        "PRISM-Simplified": {
+          "train_time": 543.2982802139995,
+          "final_loss": 0.042841903998742055,
+          "params": 21552384,
+          "mrr": 0.2330880079356057,
+          "recall@1": 0.075,
+          "recall@5": 0.4,
+          "recall@10": 0.445,
+          "n_queries": 200,
+          "corpus_size": 1630,
+          "seq_len": 256,
+          "throughput_seq_per_sec": 708.7681802408929,
+          "latency_ms": 45.148753699868394
+        },
+        "Transformer": {
+          "train_time": 132.26300049600104,
+          "final_loss": 0.056663658309262246,
+          "params": 22119936,
+          "mrr": 0.21403800600695985,
+          "recall@1": 0.07,
+          "recall@5": 0.355,
+          "recall@10": 0.385,
+          "n_queries": 200,
+          "corpus_size": 1630,
+          "seq_len": 256,
+          "throughput_seq_per_sec": 2124.544475259797,
+          "latency_ms": 15.062052299981588
+        }
+      }
+    },
+    "phase_3c": {
+      "PRISM-Simplified": {
+        "64": {
+          "throughput_seq_per_sec": 1030.6262639809083,
+          "latency_ms": 31.049082599929534
+        },
+        "128": {
+          "throughput_seq_per_sec": 882.3216730883614,
+          "latency_ms": 36.26795190011762
+        },
+        "256": {
+          "throughput_seq_per_sec": 698.1169684463772,
+          "latency_ms": 45.83759090000967
+        },
+        "512": {
+          "throughput_seq_per_sec": 471.21556943160533,
+          "latency_ms": 67.90947090012196
+        },
+        "1024": {
+          "throughput_seq_per_sec": 213.8634275578424,
+          "latency_ms": 149.6282013498785
+        },
+        "2048": {
+          "throughput_seq_per_sec": 105.47036940597494,
+          "latency_ms": 303.40274885002145
+        },
+        "4096": {
+          "throughput_seq_per_sec": 51.1498692325904,
+          "latency_ms": 625.6125475998488
+        },
+        "8192": {
+          "throughput_seq_per_sec": 24.811395068718372,
+          "latency_ms": 1289.729977349998
+        }
+      },
+      "Transformer": {
+        "64": {
+          "throughput_seq_per_sec": 8585.806347236048,
+          "latency_ms": 3.7270815000738367
+        },
+        "128": {
+          "throughput_seq_per_sec": 4468.054326093584,
+          "latency_ms": 7.161954100047296
+        },
+        "256": {
+          "throughput_seq_per_sec": 2127.8293551378592,
+          "latency_ms": 15.038799950161774
+        },
+        "512": {
+          "throughput_seq_per_sec": 890.042622707512,
+          "latency_ms": 35.95333435005159
+        },
+        "1024": {
+          "throughput_seq_per_sec": 326.34168505151735,
+          "latency_ms": 98.05673459995887
+        },
+        "2048": {
+          "throughput_seq_per_sec": 73.65370043790136,
+          "latency_ms": 434.4656115001271
+        }
+      }
+    }
+  }
+}

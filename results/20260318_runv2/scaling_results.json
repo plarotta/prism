@@ -1,0 +1,268 @@
+{
+  "config": {
+    "device": "cuda",
+    "batch_size": 8,
+    "seq_lengths": [
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4096,
+      8192,
+      16384
+    ],
+    "prism_params": 26242992,
+    "transformer_params": 25833216
+  },
+  "forward": {
+    "prism": [
+      {
+        "seq_len": 64,
+        "avg_latency_ms": 27.324950900037948,
+        "std_latency_ms": 0.5229083570207558,
+        "throughput_seq_per_sec": 292.7727127220159,
+        "memory_MB": 11.129856
+      },
+      {
+        "seq_len": 128,
+        "avg_latency_ms": 30.116330000055314,
+        "std_latency_ms": 1.5289631701746182,
+        "throughput_seq_per_sec": 265.6366164132651,
+        "memory_MB": 22.730752
+      },
+      {
+        "seq_len": 256,
+        "avg_latency_ms": 31.86808399968868,
+        "std_latency_ms": 0.7793848146641723,
+        "throughput_seq_per_sec": 251.0348598327453,
+        "memory_MB": 44.556288
+      },
+      {
+        "seq_len": 512,
+        "avg_latency_ms": 40.00937809996685,
+        "std_latency_ms": 2.244658231044524,
+        "throughput_seq_per_sec": 199.95312049118374,
+        "memory_MB": 89.124864
+      },
+      {
+        "seq_len": 1024,
+        "avg_latency_ms": 50.61649270028283,
+        "std_latency_ms": 1.5162813382624412,
+        "throughput_seq_per_sec": 158.0512511479346,
+        "memory_MB": 178.262016
+      },
+      {
+        "seq_len": 2048,
+        "avg_latency_ms": 77.72356670011504,
+        "std_latency_ms": 0.5109283655757216,
+        "throughput_seq_per_sec": 102.92888424519714,
+        "memory_MB": 356.53632
+      },
+      {
+        "seq_len": 4096,
+        "avg_latency_ms": 180.33989720006502,
+        "std_latency_ms": 1.1129848150473847,
+        "throughput_seq_per_sec": 44.36067738868111,
+        "memory_MB": 713.084928
+      },
+      {
+        "seq_len": 8192,
+        "avg_latency_ms": 365.09674819953943,
+        "std_latency_ms": 2.2286314728005987,
+        "throughput_seq_per_sec": 21.912000146404186,
+        "memory_MB": 1426.182144
+      },
+      {
+        "seq_len": 16384,
+        "avg_latency_ms": 746.7473883998537,
+        "std_latency_ms": 3.0440427156545082,
+        "throughput_seq_per_sec": 10.71312752381039,
+        "memory_MB": 2852.376576
+      }
+    ],
+    "transformer": [
+      {
+        "seq_len": 64,
+        "avg_latency_ms": 2.6707995997639955,
+        "std_latency_ms": 0.42660825482266057,
+        "throughput_seq_per_sec": 2995.357645218652,
+        "memory_MB": 6.411264
+      },
+      {
+        "seq_len": 128,
+        "avg_latency_ms": 2.5953192000088166,
+        "std_latency_ms": 0.34728098069469643,
+        "throughput_seq_per_sec": 3082.4724758221737,
+        "memory_MB": 13.555712
+      },
+      {
+        "seq_len": 256,
+        "avg_latency_ms": 4.577123199851485,
+        "std_latency_ms": 0.36228723996411794,
+        "throughput_seq_per_sec": 1747.8227372729618,
+        "memory_MB": 37.750784
+      },
+      {
+        "seq_len": 512,
+        "avg_latency_ms": 10.058612700231606,
+        "std_latency_ms": 0.38635145165031215,
+        "throughput_seq_per_sec": 795.3383074204452,
+        "memory_MB": 125.845504
+      },
+      {
+        "seq_len": 1024,
+        "avg_latency_ms": 26.202652199754084,
+        "std_latency_ms": 1.7549649582877955,
+        "throughput_seq_per_sec": 305.3126049612291,
+        "memory_MB": 453.029888
+      },
+      {
+        "seq_len": 2048,
+        "avg_latency_ms": 111.76629050005431,
+        "std_latency_ms": 3.450618760465195,
+        "throughput_seq_per_sec": 71.57793252515715,
+        "memory_MB": 3321.991168
+      },
+      {
+        "seq_len": 4096,
+        "avg_latency_ms": 395.88379390006594,
+        "std_latency_ms": 7.41324171781935,
+        "throughput_seq_per_sec": 20.20795021990585,
+        "memory_MB": 13086.445568
+      },
+      {
+        "seq_len": 8192,
+        "failed": true
+      },
+      {
+        "seq_len": 16384,
+        "failed": true
+      }
+    ]
+  },
+  "forward_backward": {
+    "prism": [
+      {
+        "seq_len": 64,
+        "avg_latency_ms": 88.1164145999719,
+        "std_latency_ms": 3.3256679598058594,
+        "throughput_seq_per_sec": 90.78898677752771,
+        "memory_MB": 135.654912
+      },
+      {
+        "seq_len": 128,
+        "avg_latency_ms": 97.24249939972651,
+        "std_latency_ms": 6.024836887583029,
+        "throughput_seq_per_sec": 82.26855592342477,
+        "memory_MB": 274.919936
+      },
+      {
+        "seq_len": 256,
+        "avg_latency_ms": 107.45777249976527,
+        "std_latency_ms": 8.560732697036245,
+        "throughput_seq_per_sec": 74.44784880514321,
+        "memory_MB": 538.912768
+      },
+      {
+        "seq_len": 512,
+        "avg_latency_ms": 124.85943699994095,
+        "std_latency_ms": 9.377892288373372,
+        "throughput_seq_per_sec": 64.07204927572901,
+        "memory_MB": 1078.933504
+      },
+      {
+        "seq_len": 1024,
+        "avg_latency_ms": 141.34071730022697,
+        "std_latency_ms": 5.504772746951575,
+        "throughput_seq_per_sec": 56.60081647248831,
+        "memory_MB": 2157.27104
+      },
+      {
+        "seq_len": 2048,
+        "avg_latency_ms": 249.90224080011103,
+        "std_latency_ms": 3.665983849236854,
+        "throughput_seq_per_sec": 32.01251807261284,
+        "memory_MB": 4290.811904
+      },
+      {
+        "seq_len": 4096,
+        "avg_latency_ms": 548.7150519002171,
+        "std_latency_ms": 3.539740509490782,
+        "throughput_seq_per_sec": 14.579516221207628,
+        "memory_MB": 8581.617664
+      },
+      {
+        "seq_len": 8192,
+        "avg_latency_ms": 1111.559249399943,
+        "std_latency_ms": 20.031029630618843,
+        "throughput_seq_per_sec": 7.197097234644639,
+        "memory_MB": 17163.229184
+      },
+      {
+        "seq_len": 16384,
+        "avg_latency_ms": 2252.7525117999176,
+        "std_latency_ms": 24.551281132839286,
+        "throughput_seq_per_sec": 3.5512112218701346,
+        "memory_MB": 34326.452224
+      }
+    ],
+    "transformer": [
+      {
+        "seq_len": 64,
+        "avg_latency_ms": 18.40641850067186,
+        "std_latency_ms": 1.4654054182502179,
+        "throughput_seq_per_sec": 434.630995688161,
+        "memory_MB": 108.772864
+      },
+      {
+        "seq_len": 128,
+        "avg_latency_ms": 17.05087980008102,
+        "std_latency_ms": 1.500313636714058,
+        "throughput_seq_per_sec": 469.18400069666706,
+        "memory_MB": 188.994048
+      },
+      {
+        "seq_len": 256,
+        "avg_latency_ms": 20.120406500245736,
+        "std_latency_ms": 1.6020599456478837,
+        "throughput_seq_per_sec": 397.6062809616841,
+        "memory_MB": 457.27488
+      },
+      {
+        "seq_len": 512,
+        "avg_latency_ms": 36.77800559999014,
+        "std_latency_ms": 0.45023620733887054,
+        "throughput_seq_per_sec": 217.52131116109638,
+        "memory_MB": 1267.030528
+      },
+      {
+        "seq_len": 1024,
+        "avg_latency_ms": 102.1848278998732,
+        "std_latency_ms": 24.525759902720612,
+        "throughput_seq_per_sec": 78.28950896544914,
+        "memory_MB": 4059.851264
+      },
+      {
+        "seq_len": 2048,
+        "avg_latency_ms": 287.79584400017484,
+        "std_latency_ms": 4.667620856904956,
+        "throughput_seq_per_sec": 27.797482718322854,
+        "memory_MB": 14250.248704
+      },
+      {
+        "seq_len": 4096,
+        "failed": true
+      },
+      {
+        "seq_len": 8192,
+        "failed": true
+      },
+      {
+        "seq_len": 16384,
+        "failed": true
+      }
+    ]
+  }
+}

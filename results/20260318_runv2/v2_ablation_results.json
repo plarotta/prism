@@ -1,0 +1,137 @@
+{
+  "Baseline (full original)": {
+    "metrics": {
+      "mrr": 0.7436615918808231,
+      "recall@1": 0.656,
+      "recall@5": 0.864,
+      "recall@10": 0.914,
+      "topic_accuracy": 0.6600000262260437,
+      "mean_rank": 7.02,
+      "median_rank": 1.0
+    },
+    "train_time": 775.6020785649998,
+    "params": 11202480,
+    "final_loss": 0.17535099539905785,
+    "final_acc": 0.951875
+  },
+  "Simplified (mean pool)": {
+    "metrics": {
+      "mrr": 0.9883555555555557,
+      "recall@1": 0.982,
+      "recall@5": 0.998,
+      "recall@10": 1.0,
+      "topic_accuracy": 0.9819999933242798,
+      "mean_rank": 1.048,
+      "median_rank": 1.0
+    },
+    "train_time": 582.3101380979988,
+    "params": 10225152,
+    "final_loss": 0.020792296212166547,
+    "final_acc": 0.9971875
+  },
+  "A: Interf. LayerNorm": {
+    "metrics": {
+      "mrr": 0.6934962206358688,
+      "recall@1": 0.6,
+      "recall@5": 0.804,
+      "recall@10": 0.882,
+      "topic_accuracy": 0.6119999885559082,
+      "mean_rank": 11.414,
+      "median_rank": 1.0
+    },
+    "train_time": 831.9098108329999,
+    "params": 11211696,
+    "final_loss": 0.18882486525923015,
+    "final_acc": 0.94375
+  },
+  "B: Interf. 1/\u221ad_c": {
+    "metrics": {
+      "mrr": 0.7631295136488618,
+      "recall@1": 0.664,
+      "recall@5": 0.896,
+      "recall@10": 0.932,
+      "topic_accuracy": 0.671999990940094,
+      "mean_rank": 3.782,
+      "median_rank": 1.0
+    },
+    "train_time": 786.0549279809984,
+    "params": 11202480,
+    "final_loss": 0.15473989106714725,
+    "final_acc": 0.9553125
+  },
+  "C: Interf. \u03b1=1/(C-1)": {
+    "metrics": {
+      "mrr": 0.7025790595941971,
+      "recall@1": 0.598,
+      "recall@5": 0.824,
+      "recall@10": 0.888,
+      "topic_accuracy": 0.6039999723434448,
+      "mean_rank": 10.828,
+      "median_rank": 1.0
+    },
+    "train_time": 786.7200246809989,
+    "params": 11202480,
+    "final_loss": 0.23693614564836024,
+    "final_acc": 0.9290625
+  },
+  "D: Interf. Gate": {
+    "metrics": {
+      "mrr": 0.7359104607184994,
+      "recall@1": 0.642,
+      "recall@5": 0.852,
+      "recall@10": 0.924,
+      "topic_accuracy": 0.6460000276565552,
+      "mean_rank": 6.8,
+      "median_rank": 1.0
+    },
+    "train_time": 805.5084735210003,
+    "params": 11202552,
+    "final_loss": 0.18732343807816507,
+    "final_acc": 0.949375
+  },
+  "E: Cov LayerNorm": {
+    "metrics": {
+      "mrr": 0.832442410484289,
+      "recall@1": 0.77,
+      "recall@5": 0.904,
+      "recall@10": 0.944,
+      "topic_accuracy": 0.7739999890327454,
+      "mean_rank": 4.378,
+      "median_rank": 1.0
+    },
+    "train_time": 790.046019950998,
+    "params": 11203632,
+    "final_loss": 0.10823603402823209,
+    "final_acc": 0.9734375
+  },
+  "F: Cov Rank8+Proj": {
+    "metrics": {
+      "mrr": 0.6099755581700427,
+      "recall@1": 0.508,
+      "recall@5": 0.732,
+      "recall@10": 0.792,
+      "topic_accuracy": 0.5099999904632568,
+      "mean_rank": 19.586,
+      "median_rank": 1.0
+    },
+    "train_time": 796.7884218440013,
+    "params": 11141424,
+    "final_loss": 0.3357895477861166,
+    "final_acc": 0.89625
+  },
+  "G: All V2 Fixes": {
+    "metrics": {
+      "mrr": 0.7346613087709225,
+      "recall@1": 0.638,
+      "recall@5": 0.86,
+      "recall@10": 0.916,
+      "topic_accuracy": 0.6439999938011169,
+      "mean_rank": 7.22,
+      "median_rank": 1.0
+    },
+    "train_time": 863.9490156309985,
+    "params": 11150840,
+    "final_loss": 0.19504117291420697,
+    "final_acc": 0.9421875
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "prism": {
+    "metrics": {
+      "mrr": 0.943044049428832,
+      "recall@1": 0.92,
+      "recall@5": 0.972,
+      "recall@10": 0.98,
+      "topic_accuracy": 0.9200000166893005,
+      "mean_rank": 1.926,
+      "median_rank": 1.0
+    },
+    "train_time": 81.39476454999931,
+    "params": 11202480
+  },
+  "transformer": {
+    "metrics": {
+      "mrr": 0.983,
+      "recall@1": 0.97,
+      "recall@5": 1.0,
+      "recall@10": 1.0,
+      "topic_accuracy": 0.972000002861023,
+      "mean_rank": 1.044,
+      "median_rank": 1.0
+    },
+    "train_time": 22.064082426999448,
+    "params": 10792704
+  },
+  "config": {
+    "vocab_size": 1024,
+    "batch_size": 32,
+    "n_steps": 400,
+    "lr": 0.0003,
+    "seq_len_q": 64,
+    "seq_len_p": 96,
+    "n_eval_queries": 500,
+    "corpus_size": 5000
+  }
+}
