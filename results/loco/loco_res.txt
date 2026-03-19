@@ -1,0 +1,336 @@
+root@a0796b20114a:/# uv run python benchmark_loco.py --max-lens 2048 8192 --n-steps 5000
+======================================================================
+LoCoV1 BENCHMARK: PRISM-Simplified vs Transformer
+Device: cuda
+Max lengths: [2048, 8192]
+Training steps: 5000
+======================================================================
+
+======================================================================
+PHASE 0: LoCoV1 Data Inspection
+======================================================================
+Loading LoCoV1 datasets from HuggingFace...
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+  Documents: 14838 rows
+  Queries: 7734 rows
+  Tokenizing documents...
+  Tokenizing queries...
+
+  Task summary:
+  Task                            Queries     Docs  Avg Q Len  Avg D Len
+  ----------------------------------------------------------------------
+  summ_screen_fd                      338      338        126       6911
+  gov_report                          972      972        733       6910
+  qmsum                               272       35         82       7694
+  qasper_title                        416      416         13       4734
+  qasper_abstract                     416      416        181       4734
+  multifieldqa                         30       30         13       6281
+  2wikimqa                             60       60         17       6376
+  passage_retrieval                    60       60        168       6523
+  courtlistener_Plain_Text           2000     2000         30       6034
+  courtlistener_HTML                 2000     2000         30       6741
+  legal_case_reports                  770      770       3603       5736
+  stackoverflow                       400     7741        197       1582
+
+Profiling document length distributions...
+  Saved: results/loco/loco_length_distributions.png
+  Saved: results/loco/loco_length_stats.json
+
+  Truncation impact analysis:
+  Task                            Docs _ 2K  Docs _ 8K    Total
+  --------------------------------------------------------------
+  summ_screen_fd                        0 (   0%)    338 ( 100%)     338
+  gov_report                            9 (   1%)    972 ( 100%)     972
+  qmsum                                 0 (   0%)     35 ( 100%)      35
+  qasper_title                         20 (   5%)    416 ( 100%)     416
+  qasper_abstract                      20 (   5%)    416 ( 100%)     416
+  multifieldqa                          1 (   3%)     30 ( 100%)      30
+  2wikimqa                              0 (   0%)     60 ( 100%)      60
+  passage_retrieval                     0 (   0%)     60 ( 100%)      60
+  courtlistener_Plain_Text            212 (  11%)   2000 ( 100%)    2000
+  courtlistener_HTML                  140 (   7%)   2000 ( 100%)    2000
+  legal_case_reports                   71 (   9%)    770 ( 100%)     770
+  stackoverflow                      5024 (  65%)   7741 ( 100%)    7741
+
+======================================================================
+PHASE 1: LoCoV1 Evaluation (max_len=2048, 5000 steps)
+======================================================================
+  Created 10742 training pairs from 12 tasks
+
+============================================================
+  Model: PRISM-Simplified
+============================================================
+  Parameters: 19,193,088
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16, eval_batch=32
+
+Training PRISM-Simplified (5000 steps, max_len=2048, micro_batch=16, accum=1, effective_batch=16)...
+  [PRISM-Simplified] Step 100/5000  loss=1.7247  (21.8s)
+  [PRISM-Simplified] Step 200/5000  loss=1.3772  (42.3s)
+  [PRISM-Simplified] Step 300/5000  loss=1.2521  (62.6s)
+  [PRISM-Simplified] Step 400/5000  loss=1.1185  (82.9s)
+  [PRISM-Simplified] Step 500/5000  loss=1.0584  (103.2s)
+  [PRISM-Simplified] Step 600/5000  loss=0.9177  (123.6s)
+  [PRISM-Simplified] Step 700/5000  loss=0.8629  (144.0s)
+  [PRISM-Simplified] Step 800/5000  loss=0.7515  (164.3s)
+  [PRISM-Simplified] Step 900/5000  loss=0.7275  (184.7s)
+  [PRISM-Simplified] Step 1000/5000  loss=0.6434  (205.0s)
+  [PRISM-Simplified] Step 1100/5000  loss=0.6146  (225.3s)
+  [PRISM-Simplified] Step 1200/5000  loss=0.5439  (245.6s)
+  [PRISM-Simplified] Step 1300/5000  loss=0.5434  (265.9s)
+  [PRISM-Simplified] Step 1400/5000  loss=0.4611  (286.2s)
+  [PRISM-Simplified] Step 1500/5000  loss=0.4412  (306.5s)
+  [PRISM-Simplified] Step 1600/5000  loss=0.3912  (326.8s)
+  [PRISM-Simplified] Step 1700/5000  loss=0.3801  (347.2s)
+  [PRISM-Simplified] Step 1800/5000  loss=0.3109  (367.5s)
+  [PRISM-Simplified] Step 1900/5000  loss=0.3216  (387.8s)
+  [PRISM-Simplified] Step 2000/5000  loss=0.3086  (408.2s)
+  [PRISM-Simplified] Step 2100/5000  loss=0.2708  (428.5s)
+  [PRISM-Simplified] Step 2200/5000  loss=0.2287  (448.8s)
+  [PRISM-Simplified] Step 2300/5000  loss=0.2327  (469.1s)
+   [PRISM-Simplified] Step 2400/5000  loss=0.2075  (489.5s)
+  [PRISM-Simplified] Step 2500/5000  loss=0.2142  (509.8s)
+  [PRISM-Simplified] Step 2600/5000  loss=0.1911  (530.1s)
+  [PRISM-Simplified] Step 2700/5000  loss=0.1682  (550.4s)
+  [PRISM-Simplified] Step 2800/5000  loss=0.1629  (570.7s)
+  [PRISM-Simplified] Step 2900/5000  loss=0.1647  (591.0s)
+  [PRISM-Simplified] Step 3000/5000  loss=0.1167  (611.3s)
+   [PRISM-Simplified] Step 3100/5000  loss=0.1370  (631.6s)
+  [PRISM-Simplified] Step 3200/5000  loss=0.1151  (651.9s)
+  [PRISM-Simplified] Step 3300/5000  loss=0.1260  (672.2s)
+  [PRISM-Simplified] Step 3400/5000  loss=0.1069  (692.5s)
+  [PRISM-Simplified] Step 3500/5000  loss=0.1281  (712.8s)
+  [PRISM-Simplified] Step 3600/5000  loss=0.0850  (733.1s)
+  [PRISM-Simplified] Step 3700/5000  loss=0.0798  (753.4s)
+  [PRISM-Simplified] Step 3800/5000  loss=0.0767  (773.7s)
+  [PRISM-Simplified] Step 3900/5000  loss=0.0805  (794.0s)
+  [PRISM-Simplified] Step 4000/5000  loss=0.0725  (814.1s)
+  [PRISM-Simplified] Step 4100/5000  loss=0.0652  (834.1s)
+  [PRISM-Simplified] Step 4200/5000  loss=0.0763  (854.1s)
+  [PRISM-Simplified] Step 4300/5000  loss=0.0683  (874.1s)
+  [PRISM-Simplified] Step 4400/5000  loss=0.0651  (894.1s)
+  [PRISM-Simplified] Step 4500/5000  loss=0.0632  (914.1s)
+  [PRISM-Simplified] Step 4600/5000  loss=0.0627  (934.4s)
+  [PRISM-Simplified] Step 4700/5000  loss=0.0610  (954.8s)
+  [PRISM-Simplified] Step 4800/5000  loss=0.0584  (975.1s)
+  [PRISM-Simplified] Step 4900/5000  loss=0.0607  (995.4s)
+  [PRISM-Simplified] Step 5000/5000  loss=0.0629  (1015.7s)
+  [PRISM-Simplified] Training complete in 1015.7s
+
+  Evaluating PRISM-Simplified on all 12 LoCoV1 tasks...
+    summ_screen_fd: nDCG@10=0.6475  (338 queries, 338 docs)
+    gov_report: nDCG@10=0.8191  (972 queries, 972 docs)
+    qmsum: nDCG@10=0.6482  (272 queries, 35 docs)
+    qasper_title: nDCG@10=0.6533  (416 queries, 416 docs)
+    qasper_abstract: nDCG@10=0.8218  (416 queries, 416 docs)
+    multifieldqa: nDCG@10=0.8895  (30 queries, 30 docs)
+    2wikimqa: nDCG@10=0.6008  (60 queries, 60 docs)
+    passage_retrieval: nDCG@10=0.7289  (60 queries, 60 docs)
+    courtlistener_Plain_Text: nDCG@10=0.8031  (2000 queries, 2000 docs)
+    courtlistener_HTML: nDCG@10=0.8028  (2000 queries, 2000 docs)
+    legal_case_reports: nDCG@10=0.2342  (770 queries, 770 docs)
+    stackoverflow: nDCG@10=0.6126  (400 queries, 7741 docs)
+
+  PRISM-Simplified average nDCG@10: 0.6885
+
+============================================================
+  Model: Transformer
+============================================================
+  Parameters: 19,760,640
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16, eval_batch=32
+
+Training Transformer (5000 steps, max_len=2048, micro_batch=16, accum=1, effective_batch=16)...
+  [Transformer] Step 100/5000  loss=2.0812  (40.3s)
+  [Transformer] Step 200/5000  loss=1.7369  (80.5s)
+  [Transformer] Step 300/5000  loss=1.6698  (120.8s)
+  [Transformer] Step 400/5000  loss=1.6016  (161.1s)
+  [Transformer] Step 500/5000  loss=1.5380  (201.3s)
+  [Transformer] Step 600/5000  loss=1.4203  (241.6s)
+  [Transformer] Step 700/5000  loss=1.4443  (281.8s)
+  [Transformer] Step 800/5000  loss=1.3653  (322.1s)
+  [Transformer] Step 900/5000  loss=1.3357  (362.3s)
+  [Transformer] Step 1000/5000  loss=1.2209  (402.5s)
+  [Transformer] Step 1100/5000  loss=1.2619  (442.8s)
+  [Transformer] Step 1200/5000  loss=1.2293  (483.0s)
+  [Transformer] Step 1300/5000  loss=1.2362  (523.2s)
+  [Transformer] Step 1400/5000  loss=1.2210  (563.4s)
+  [Transformer] Step 1500/5000  loss=1.2122  (603.6s)
+  [Transformer] Step 1600/5000  loss=1.1641  (643.9s)
+  [Transformer] Step 1700/5000  loss=1.0932  (684.1s)
+  [Transformer] Step 1800/5000  loss=1.1465  (724.4s)
+  [Transformer] Step 1900/5000  loss=1.0962  (764.7s)
+  [Transformer] Step 2000/5000  loss=1.1026  (804.9s)
+  [Transformer] Step 2100/5000  loss=1.0366  (845.1s)
+  [Transformer] Step 2200/5000  loss=1.0381  (885.3s)
+  [Transformer] Step 2300/5000  loss=1.0487  (925.5s)
+  [Transformer] Step 2400/5000  loss=0.9791  (965.7s)
+  [Transformer] Step 2500/5000  loss=0.9763  (1006.0s)
+  [Transformer] Step 2600/5000  loss=0.9494  (1046.2s)
+  [Transformer] Step 2700/5000  loss=0.9035  (1086.5s)
+  [Transformer] Step 2800/5000  loss=0.9376  (1126.7s)
+  [Transformer] Step 2900/5000  loss=0.8542  (1167.0s)
+  [Transformer] Step 3000/5000  loss=0.8722  (1207.3s)
+  [Transformer] Step 3100/5000  loss=0.8471  (1247.5s)
+  [Transformer] Step 3200/5000  loss=0.7743  (1287.8s)
+  [Transformer] Step 3300/5000  loss=0.7933  (1328.0s)
+  [Transformer] Step 3400/5000  loss=0.8340  (1368.3s)
+  [Transformer] Step 3500/5000  loss=0.7853  (1408.6s)
+  [Transformer] Step 3600/5000  loss=0.7498  (1448.8s)
+  [Transformer] Step 3700/5000  loss=0.7169  (1489.1s)
+  [Transformer] Step 3800/5000  loss=0.6786  (1529.3s)
+  [Transformer] Step 3900/5000  loss=0.6904  (1569.6s)
+  [Transformer] Step 4000/5000  loss=0.6794  (1609.8s)
+  [Transformer] Step 4100/5000  loss=0.6687  (1650.1s)
+  [Transformer] Step 4200/5000  loss=0.6660  (1690.3s)
+  [Transformer] Step 4300/5000  loss=0.6316  (1730.6s)
+  [Transformer] Step 4400/5000  loss=0.6928  (1770.9s)
+  [Transformer] Step 4500/5000  loss=0.6465  (1811.1s)
+  [Transformer] Step 4600/5000  loss=0.6453  (1851.4s)
+  [Transformer] Step 4700/5000  loss=0.6823  (1891.6s)
+  [Transformer] Step 4800/5000  loss=0.6522  (1931.9s)
+  [Transformer] Step 4900/5000  loss=0.6258  (1972.1s)
+  [Transformer] Step 5000/5000  loss=0.6633  (2012.3s)
+  [Transformer] Training complete in 2012.3s
+
+  Evaluating Transformer on all 12 LoCoV1 tasks...
+    summ_screen_fd: nDCG@10=0.0904  (338 queries, 338 docs)
+    gov_report: nDCG@10=0.2480  (972 queries, 972 docs)
+    qmsum: nDCG@10=0.4090  (272 queries, 35 docs)
+    qasper_title: nDCG@10=0.0918  (416 queries, 416 docs)
+    qasper_abstract: nDCG@10=0.1353  (416 queries, 416 docs)
+    multifieldqa: nDCG@10=0.5470  (30 queries, 30 docs)
+    2wikimqa: nDCG@10=0.2882  (60 queries, 60 docs)
+    passage_retrieval: nDCG@10=0.1958  (60 queries, 60 docs)
+    courtlistener_Plain_Text: nDCG@10=0.1111  (2000 queries, 2000 docs)
+    courtlistener_HTML: nDCG@10=0.1112  (2000 queries, 2000 docs)
+    legal_case_reports: nDCG@10=0.0174  (770 queries, 770 docs)
+    stackoverflow: nDCG@10=0.0880  (400 queries, 7741 docs)
+
+  Transformer average nDCG@10: 0.1944
+
+  Saved: results/loco/loco_per_task_maxlen2048.png
+
+======================================================================
+PHASE 1: LoCoV1 Evaluation (max_len=8192, 5000 steps)
+======================================================================
+  Created 10742 training pairs from 12 tasks
+
+============================================================
+  Model: PRISM-Simplified
+============================================================
+  Parameters: 21,552,384
+  Batch config: micro_batch=16, grad_accum=1, effective_batch=16, eval_batch=32
+
+Training PRISM-Simplified (5000 steps, max_len=8192, micro_batch=16, accum=1, effective_batch=16)...
+  [PRISM-Simplified] Step 100/5000  loss=1.8134  (71.1s)
+  [PRISM-Simplified] Step 200/5000  loss=1.4709  (142.1s)
+  [PRISM-Simplified] Step 300/5000  loss=1.2805  (213.1s)
+  [PRISM-Simplified] Step 400/5000  loss=1.2022  (284.1s)
+  [PRISM-Simplified] Step 500/5000  loss=1.1380  (355.0s)
+  [PRISM-Simplified] Step 600/5000  loss=1.0415  (425.9s)
+  [PRISM-Simplified] Step 700/5000  loss=0.9696  (496.8s)
+  [PRISM-Simplified] Step 800/5000  loss=0.9110  (567.7s)
+  [PRISM-Simplified] Step 900/5000  loss=0.8363  (638.6s)
+  [PRISM-Simplified] Step 1000/5000  loss=0.7801  (709.5s)
+  [PRISM-Simplified] Step 1100/5000  loss=0.7340  (780.3s)
+  [PRISM-Simplified] Step 1200/5000  loss=0.6302  (851.2s)
+  [PRISM-Simplified] Step 1300/5000  loss=0.5906  (922.1s)
+  [PRISM-Simplified] Step 1400/5000  loss=0.5702  (993.0s)
+  [PRISM-Simplified] Step 1500/5000  loss=0.5814  (1064.0s)
+  [PRISM-Simplified] Step 1600/5000  loss=0.4836  (1134.9s)
+  [PRISM-Simplified] Step 1700/5000  loss=0.4544  (1205.9s)
+  [PRISM-Simplified] Step 1800/5000  loss=0.4081  (1276.8s)
+  [PRISM-Simplified] Step 1900/5000  loss=0.4089  (1347.8s)
+  [PRISM-Simplified] Step 2000/5000  loss=0.3550  (1418.7s)
+  [PRISM-Simplified] Step 2100/5000  loss=0.3166  (1489.6s)
+  [PRISM-Simplified] Step 2200/5000  loss=0.3369  (1560.6s)
+  [PRISM-Simplified] Step 2300/5000  loss=0.3213  (1631.5s)
+  [PRISM-Simplified] Step 2400/5000  loss=0.2732  (1702.5s)
+  [PRISM-Simplified] Step 2500/5000  loss=0.2753  (1773.5s)
+  [PRISM-Simplified] Step 2600/5000  loss=0.2341  (1844.5s)
+  [PRISM-Simplified] Step 2700/5000  loss=0.2201  (1915.4s)
+  [PRISM-Simplified] Step 2800/5000  loss=0.1990  (1986.3s)
+  [PRISM-Simplified] Step 2900/5000  loss=0.1978  (2057.3s)
+  [PRISM-Simplified] Step 3000/5000  loss=0.1963  (2128.3s)
+  [PRISM-Simplified] Step 3100/5000  loss=0.1830  (2199.3s)
+  [PRISM-Simplified] Step 3200/5000  loss=0.1484  (2270.2s)
+  [PRISM-Simplified] Step 3300/5000  loss=0.1479  (2341.1s)
+  [PRISM-Simplified] Step 3400/5000  loss=0.1393  (2412.2s)
+  [PRISM-Simplified] Step 3500/5000  loss=0.1501  (2483.3s)
+  [PRISM-Simplified] Step 3600/5000  loss=0.1073  (2554.4s)
+  [PRISM-Simplified] Step 3700/5000  loss=0.1216  (2625.4s)
+  [PRISM-Simplified] Step 3800/5000  loss=0.1069  (2696.4s)
+  [PRISM-Simplified] Step 3900/5000  loss=0.1169  (2767.4s)
+  [PRISM-Simplified] Step 4000/5000  loss=0.1206  (2838.5s)
+  [PRISM-Simplified] Step 4100/5000  loss=0.0949  (2909.4s)
+  [PRISM-Simplified] Step 4200/5000  loss=0.1042  (2980.4s)
+  [PRISM-Simplified] Step 4300/5000  loss=0.1028  (3051.3s)
+  [PRISM-Simplified] Step 4400/5000  loss=0.0839  (3122.3s)
+  [PRISM-Simplified] Step 4500/5000  loss=0.0815  (3193.3s)
+  [PRISM-Simplified] Step 4600/5000  loss=0.0820  (3264.3s)
+  [PRISM-Simplified] Step 4700/5000  loss=0.0735  (3335.3s)
+  [PRISM-Simplified] Step 4800/5000  loss=0.0909  (3406.3s)
+  [PRISM-Simplified] Step 4900/5000  loss=0.0768  (3477.3s)
+  [PRISM-Simplified] Step 5000/5000  loss=0.0628  (3548.3s)
+  [PRISM-Simplified] Training complete in 3548.3s
+
+  Evaluating PRISM-Simplified on all 12 LoCoV1 tasks...
+    summ_screen_fd: nDCG@10=0.4911  (338 queries, 338 docs)
+    gov_report: nDCG@10=0.7806  (972 queries, 972 docs)
+    qmsum: nDCG@10=0.5542  (272 queries, 35 docs)
+    qasper_title: nDCG@10=0.5276  (416 queries, 416 docs)
+    qasper_abstract: nDCG@10=0.7276  (416 queries, 416 docs)
+    multifieldqa: nDCG@10=0.6804  (30 queries, 30 docs)
+    2wikimqa: nDCG@10=0.5257  (60 queries, 60 docs)
+    passage_retrieval: nDCG@10=0.6158  (60 queries, 60 docs)
+    courtlistener_Plain_Text: nDCG@10=0.6838  (2000 queries, 2000 docs)
+    courtlistener_HTML: nDCG@10=0.6739  (2000 queries, 2000 docs)
+    legal_case_reports: nDCG@10=0.1924  (770 queries, 770 docs)
+    stackoverflow: nDCG@10=0.4835  (400 queries, 7741 docs)
+
+  PRISM-Simplified average nDCG@10: 0.5780
+
+============================================================
+  Model: Transformer
+============================================================
+  Parameters: 22,119,936
+  Batch config: micro_batch=4, grad_accum=4, effective_batch=16, eval_batch=12
+
+Training Transformer (5000 steps, max_len=8192, micro_batch=4, accum=4, effective_batch=16)...
+Traceback (most recent call last):
+  File "/root/software/prism/benchmark_loco.py", line 916, in <module>
+    main(
+  File "/root/software/prism/benchmark_loco.py", line 852, in main
+    results = run_phase_1(
+  File "/root/software/prism/benchmark_loco.py", line 630, in run_phase_1
+    losses, train_time = train_contrastive(
+  File "/root/software/prism/benchmark_loco.py", line 449, in train_contrastive
+    result = model_wrapper(q_ids, q_mask, d_ids, d_mask)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/software/prism/baseline_transformer.py", line 143, in forward
+    p_emb = self.encode(pos_ids, pos_mask)
+  File "/root/software/prism/baseline_transformer.py", line 130, in encode
+    out = self.encoder(input_ids, attention_mask)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/software/prism/baseline_transformer.py", line 102, in forward
+    x = layer(x, key_padding_mask=key_padding_mask)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/software/prism/baseline_transformer.py", line 38, in forward
+    attn_out, _ = self.attn(normed, normed, normed, key_padding_mask=key_padding_mask)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1776, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1787, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/modules/activation.py", line 1491, in forward
+    attn_output, attn_output_weights = F.multi_head_attention_forward(
+  File "/root/software/prism/.venv/lib/python3.10/site-packages/torch/nn/functional.py", line 6585, in multi_head_attention_forward
+    attn_output_weights = torch.baddbmm(
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 6.00 GiB. GPU 0 has a total capacity of 94.97 GiB of which 3.72 GiB is free. Including non-PyTorch memory, this process has 91.24 GiB memory in use. Of the allocated memory 85.51 GiB is allocated by PyTorch, and 5.08 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)

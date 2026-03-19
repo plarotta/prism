@@ -1,0 +1,122 @@
+{
+  "summ_screen_fd": {
+    "n_docs": 338,
+    "doc_mean": 6911.097633136094,
+    "doc_median": 7786.5,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 2552,
+    "n_queries": 338,
+    "query_mean": 126.41420118343196
+  },
+  "gov_report": {
+    "n_docs": 972,
+    "doc_mean": 6909.530864197531,
+    "doc_median": 8192.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 1081,
+    "n_queries": 972,
+    "query_mean": 732.5154320987655
+  },
+  "qmsum": {
+    "n_docs": 35,
+    "doc_mean": 7694.057142857143,
+    "doc_median": 8192.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 2490,
+    "n_queries": 272,
+    "query_mean": 82.11397058823529
+  },
+  "qasper_title": {
+    "n_docs": 416,
+    "doc_mean": 4733.673076923077,
+    "doc_median": 4638.5,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 843,
+    "n_queries": 416,
+    "query_mean": 13.067307692307692
+  },
+  "qasper_abstract": {
+    "n_docs": 416,
+    "doc_mean": 4733.673076923077,
+    "doc_median": 4638.5,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 843,
+    "n_queries": 416,
+    "query_mean": 180.71394230769232
+  },
+  "multifieldqa": {
+    "n_docs": 30,
+    "doc_mean": 6281.266666666666,
+    "doc_median": 7088.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 1467,
+    "n_queries": 30,
+    "query_mean": 13.233333333333333
+  },
+  "2wikimqa": {
+    "n_docs": 60,
+    "doc_mean": 6375.95,
+    "doc_median": 6980.5,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 2721,
+    "n_queries": 60,
+    "query_mean": 16.55
+  },
+  "passage_retrieval": {
+    "n_docs": 60,
+    "doc_mean": 6522.966666666666,
+    "doc_median": 7349.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 3350,
+    "n_queries": 60,
+    "query_mean": 168.35
+  },
+  "courtlistener_Plain_Text": {
+    "n_docs": 2000,
+    "doc_mean": 6033.846,
+    "doc_median": 7345.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 69,
+    "n_queries": 2000,
+    "query_mean": 30.2075
+  },
+  "courtlistener_HTML": {
+    "n_docs": 2000,
+    "doc_mean": 6741.466,
+    "doc_median": 8192.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 328,
+    "n_queries": 2000,
+    "query_mean": 30.2075
+  },
+  "legal_case_reports": {
+    "n_docs": 770,
+    "doc_mean": 5735.745454545455,
+    "doc_median": 6248.0,
+    "doc_p95": 8192.0,
+    "doc_max": 8192,
+    "doc_min": 227,
+    "n_queries": 770,
+    "query_mean": 3602.8558441558444
+  },
+  "stackoverflow": {
+    "n_docs": 7741,
+    "doc_mean": 1582.3381991990698,
+    "doc_median": 1623.0,
+    "doc_p95": 4498.0,
+    "doc_max": 8192,
+    "doc_min": 4,
+    "n_queries": 400,
+    "query_mean": 196.765
+  }
+}

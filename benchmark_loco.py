@@ -500,6 +500,86 @@ def run_phase_0(tokenizer, max_len=8192):
 
 
 # ---------------------------------------------------------------------------
+# LR Sweep: find the best learning rate per model before the full run
+# ---------------------------------------------------------------------------
+
+LR_CANDIDATES = [1e-4, 3e-4, 5e-4, 1e-3]
+
+
+def run_lr_sweep(
+    tasks: dict,
+    max_len: int = 2048,
+    sweep_steps: int = 500,
+    batch_size: int = 16,
+):
+    """Short training runs at each candidate LR to find the best per model.
+
+    Trains each model for `sweep_steps` at each LR, picks the LR with the
+    lowest final loss (averaged over last 50 steps). Runs at the shortest
+    max_len requested to keep costs low — LR preferences don't change much
+    with sequence length.
+
+    Returns dict: {model_name: best_lr}
+    """
+    print("\n" + "=" * 70)
+    print(f"LR SWEEP: {len(LR_CANDIDATES)} candidates × 2 models × {sweep_steps} steps")
+    print(f"  Candidates: {LR_CANDIDATES}")
+    print(f"  max_len={max_len} (sweep only)")
+    print("=" * 70)
+
+    train_pairs = make_training_pairs(tasks)
+    best_lrs = {}
+
+    for name, build_encoder, WrapperClass in [
+        ("PRISM-Simplified", lambda: build_simplified_prism(max_len=max_len), PRISMForEmbedding),
+        ("Transformer", lambda: build_transformer(max_len=max_len), TransformerForEmbedding),
+    ]:
+        print(f"\n  Sweeping {name}...")
+        bcfg = _get_batch_config(name, max_len, batch_size)
+        lr_losses = {}
+
+        for lr in LR_CANDIDATES:
+            torch.manual_seed(42)
+            random.seed(42)
+
+            encoder = build_encoder().to(DEVICE)
+            wrapper = WrapperClass(encoder, temperature=0.05).to(DEVICE)
+
+            losses, _ = train_contrastive(
+                wrapper, train_pairs, sweep_steps, f"{name}/lr={lr}",
+                max_len=max_len,
+                micro_batch=bcfg["micro_batch"],
+                grad_accum_steps=bcfg["grad_accum_steps"],
+                lr=lr,
+                log_interval=sweep_steps,  # only log at the end
+            )
+
+            final_loss = float(np.mean(losses[-50:])) if len(losses) >= 50 else float(np.mean(losses))
+            lr_losses[lr] = final_loss
+            print(f"    lr={lr:.0e}  final_loss={final_loss:.4f}")
+
+            del wrapper, encoder
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+        best_lr = min(lr_losses, key=lr_losses.get)
+        best_lrs[name] = best_lr
+        print(f"  → Best for {name}: lr={best_lr:.0e} (loss={lr_losses[best_lr]:.4f})")
+
+    # Save sweep results
+    sweep_results = {name: {str(lr): loss for lr, loss in
+                            zip(LR_CANDIDATES, [0]*len(LR_CANDIDATES))}
+                     for name in best_lrs}
+    # Actually re-run to get the data correctly
+    with open(RESULTS_DIR / "lr_sweep.json", "w") as f:
+        json.dump({"best_lrs": {k: v for k, v in best_lrs.items()},
+                    "max_len": max_len, "sweep_steps": sweep_steps}, f, indent=2)
+    print(f"\n  Saved: {RESULTS_DIR / 'lr_sweep.json'}")
+
+    return best_lrs
+
+
+# ---------------------------------------------------------------------------
 # Phase 1: Train from scratch + evaluate
 # ---------------------------------------------------------------------------
 
@@ -526,17 +606,19 @@ def _get_batch_config(model_name: str, max_len: int, base_batch: int) -> dict:
     is_transformer = "transformer" in model_name.lower()
 
     # Empirical training memory per sample (MB, fp32, fwd+bwd) from A100 benchmarks.
-    # These are conservative estimates including activations + optimizer states.
+    # IMPORTANT: each training "sample" is a (query, document) pair, and the forward
+    # pass encodes BOTH, so actual sequences in GPU memory = 2 × micro_batch.
+    # These estimates account for that 2x factor.
     # Transformer: O(n^2) attention dominates at long sequences.
     # PRISM: O(n) recurrence, memory grows linearly.
     if is_transformer:
-        # Approximate MB per sample for training (fwd+bwd):
-        # 512: ~50, 2048: ~1200, 4096: ~5000, 8192: ~20000
-        mem_per_sample = {512: 50, 1024: 170, 2048: 1200, 4096: 5000, 8192: 20000}
+        # Approximate MB per training pair (fwd+bwd, includes both query + doc encoding):
+        # 512: ~100, 2048: ~2400, 4096: ~10000, 8192: ~40000
+        mem_per_sample = {512: 100, 1024: 340, 2048: 2400, 4096: 10000, 8192: 40000}
     else:
         # PRISM is much lighter:
-        # 512: ~35, 2048: ~135, 4096: ~270, 8192: ~540
-        mem_per_sample = {512: 35, 1024: 70, 2048: 135, 4096: 270, 8192: 540}
+        # 512: ~70, 2048: ~270, 4096: ~540, 8192: ~1080
+        mem_per_sample = {512: 70, 1024: 140, 2048: 270, 4096: 540, 8192: 1080}
 
     # Interpolate/extrapolate for the target max_len
     lengths = sorted(mem_per_sample.keys())
@@ -587,13 +669,20 @@ def run_phase_1(
     n_steps: int = 5000,
     batch_size: int = 16,
     lr: float = 3e-4,
+    model_lrs: dict = None,
 ):
     """Phase 1: Train PRISM-Simplified and Transformer from scratch on LoCoV1.
 
     No pretraining. Tests whether the architecture can learn the retrieval task.
     At long sequence lengths, the Transformer uses gradient accumulation with
     small micro-batches to avoid OOM.
+
+    Args:
+        model_lrs: optional dict {model_name: lr} from LR sweep. Falls back to `lr`.
     """
+    if model_lrs is None:
+        model_lrs = {}
+
     print("\n" + "=" * 70)
     print(f"PHASE 1: LoCoV1 Evaluation (max_len={max_len}, {n_steps} steps)")
     print("=" * 70)
@@ -621,10 +710,13 @@ def run_phase_1(
 
         # Get per-model batch config
         bcfg = _get_batch_config(name, max_len, batch_size)
+        model_lr = model_lrs.get(name, lr)
         print(f"  Batch config: micro_batch={bcfg['micro_batch']}, "
               f"grad_accum={bcfg['grad_accum_steps']}, "
               f"effective_batch={bcfg['micro_batch'] * bcfg['grad_accum_steps']}, "
               f"eval_batch={bcfg['eval_batch']}")
+        print(f"  Learning rate: {model_lr:.0e}"
+              + (" (from LR sweep)" if name in model_lrs else " (default)"))
 
         # Train
         losses, train_time = train_contrastive(
@@ -632,7 +724,7 @@ def run_phase_1(
             max_len=max_len,
             micro_batch=bcfg["micro_batch"],
             grad_accum_steps=bcfg["grad_accum_steps"],
-            lr=lr,
+            lr=model_lr,
         )
 
         # Evaluate per task
@@ -691,6 +783,7 @@ def run_phase_1(
             "params": n_params,
             "max_len": max_len,
             "n_steps": n_steps,
+            "lr": model_lr,
             "micro_batch": bcfg["micro_batch"],
             "grad_accum_steps": bcfg["grad_accum_steps"],
         }
@@ -820,6 +913,8 @@ def main(
     batch_size: int = 16,
     lr: float = 3e-4,
     skip_phase_0: bool = False,
+    skip_lr_sweep: bool = False,
+    sweep_steps: int = 500,
 ):
     if max_lens is None:
         max_lens = [2048]
@@ -846,12 +941,23 @@ def main(
     else:
         tasks = load_loco_data(tokenizer, max_len=tokenize_max_len)
 
+    # LR Sweep: find best LR per model (runs at shortest max_len to save time)
+    if skip_lr_sweep:
+        print("\n  Skipping LR sweep — using default lr={:.0e} for all models".format(lr))
+        model_lrs = {}
+    else:
+        sweep_max_len = min(max_lens)
+        model_lrs = run_lr_sweep(
+            tasks, max_len=sweep_max_len, sweep_steps=sweep_steps,
+            batch_size=batch_size,
+        )
+
     # Phase 1: Train and evaluate at each max_len
     all_len_results = {}
     for max_len in max_lens:
         results = run_phase_1(
             tasks, max_len=max_len, n_steps=n_steps,
-            batch_size=batch_size, lr=lr,
+            batch_size=batch_size, lr=lr, model_lrs=model_lrs,
         )
         all_len_results[max_len] = results
 
@@ -870,7 +976,8 @@ def main(
             "max_lens": max_lens,
             "n_steps": n_steps,
             "batch_size": batch_size,
-            "lr": lr,
+            "default_lr": lr,
+            "model_lrs": {k: v for k, v in model_lrs.items()} if model_lrs else "no sweep",
         },
     }
     for max_len, results in all_len_results.items():
@@ -894,7 +1001,8 @@ def main(
     for max_len, results in all_len_results.items():
         for model_name, model_results in results.items():
             avg = model_results.get("avg_nDCG@10", 0)
-            print(f"  {model_name:<25} {avg:.4f}  (max_len={max_len}, {n_steps} steps)")
+            used_lr = model_results.get("lr", lr)
+            print(f"  {model_name:<25} {avg:.4f}  (max_len={max_len}, lr={used_lr:.0e}, {n_steps} steps)")
 
     return all_len_results
 
@@ -911,6 +1019,10 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
     parser.add_argument("--skip-phase-0", action="store_true",
                         help="Skip data inspection phase")
+    parser.add_argument("--skip-lr-sweep", action="store_true",
+                        help="Skip LR sweep, use --lr for all models")
+    parser.add_argument("--sweep-steps", type=int, default=500,
+                        help="Training steps per LR candidate in sweep")
     args = parser.parse_args()
 
     main(
@@ -919,4 +1031,6 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         lr=args.lr,
         skip_phase_0=args.skip_phase_0,
+        skip_lr_sweep=args.skip_lr_sweep,
+        sweep_steps=args.sweep_steps,
     )

@@ -493,6 +493,72 @@ class AttentiveCovariancePooling(nn.Module):
         return embedding
 
 
+class AttentivePooling(nn.Module):
+    """Learned single-query attentive pooling.
+
+    A single learned query vector attends over token representations, producing
+    a weighted sum. Simpler than AttentiveCovariancePooling — no covariance sketch,
+    no input-dependent query. Adds ~d parameters (negligible).
+    """
+
+    def __init__(self, d: int, d_e: int, **kwargs):
+        super().__init__()
+        self.query = nn.Parameter(torch.randn(d) * 0.02)
+        self.proj = nn.Linear(d, d_e)
+        self.norm = nn.LayerNorm(d_e)
+
+    def forward(self, f: Tensor, query_state=None, mask: Optional[Tensor] = None) -> Tensor:
+        """
+        Args:
+            f:    (B, T, d) — fused token representations
+            query_state: ignored (kept for interface compatibility with MeanPooling)
+            mask: (B, T) — True for valid positions
+        Returns:
+            embedding: (B, d_e)
+        """
+        scores = torch.einsum("d, btd -> bt", self.query, f) / math.sqrt(f.shape[-1])
+        if mask is not None:
+            scores = scores.masked_fill(~mask, float("-inf"))
+        attn = F.softmax(scores, dim=-1)  # (B, T)
+        pooled = torch.einsum("bt, btd -> bd", attn, f)  # (B, d)
+        return self.norm(self.proj(pooled))
+
+
+class MultiHeadAttentivePooling(nn.Module):
+    """Multi-head attentive pooling with K learned query vectors.
+
+    Each query independently attends over token representations. Results are
+    concatenated and projected down to d_e dimensions. Lets different queries
+    focus on different aspects of the document (entities, topics, conclusions).
+    """
+
+    def __init__(self, d: int, d_e: int, n_heads: int = 4, **kwargs):
+        super().__init__()
+        self.n_heads = n_heads
+        self.queries = nn.Parameter(torch.randn(n_heads, d) * 0.02)
+        self.proj = nn.Linear(n_heads * d, d_e)
+        self.norm = nn.LayerNorm(d_e)
+
+    def forward(self, f: Tensor, query_state=None, mask: Optional[Tensor] = None) -> Tensor:
+        """
+        Args:
+            f:    (B, T, d) — fused token representations
+            query_state: ignored
+            mask: (B, T) — True for valid positions
+        Returns:
+            embedding: (B, d_e)
+        """
+        B, T, D = f.shape
+        # (K, d) @ (B, T, d).T -> (K, B, T)
+        scores = torch.einsum("kd, btd -> kbt", self.queries, f) / math.sqrt(D)
+        if mask is not None:
+            scores = scores.masked_fill(~mask.unsqueeze(0), float("-inf"))
+        attn = F.softmax(scores, dim=-1)  # (K, B, T)
+        pooled = torch.einsum("kbt, btd -> kbd", attn, f)  # (K, B, d)
+        pooled = pooled.permute(1, 0, 2).reshape(B, -1)  # (B, K*d)
+        return self.norm(self.proj(pooled))
+
+
 class AttentiveCovariancePoolingV2(nn.Module):
     """V2 pooling with three targeted fixes:
 
