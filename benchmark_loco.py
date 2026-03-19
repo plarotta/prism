@@ -503,37 +503,82 @@ def run_phase_0(tokenizer, max_len=8192):
 # Phase 1: Train from scratch + evaluate
 # ---------------------------------------------------------------------------
 
+def _get_gpu_mem_gb() -> float:
+    """Detect available GPU memory in GB."""
+    if torch.cuda.is_available():
+        total = torch.cuda.get_device_properties(0).total_mem / 1024**3
+        return total
+    return 0.0
+
+
 def _get_batch_config(model_name: str, max_len: int, base_batch: int) -> dict:
     """Determine micro-batch size, gradient accumulation, and eval batch size.
 
     PRISM scales linearly with sequence length — can use larger batches.
-    Transformer has O(n^2) memory — needs tiny micro-batches at long sequences
+    Transformer has O(n^2) memory — needs smaller micro-batches at long sequences
     with gradient accumulation to compensate.
+
+    Adapts to available GPU memory (auto-detected).
 
     Returns dict with keys: micro_batch, grad_accum_steps, eval_batch
     """
+    gpu_mem = _get_gpu_mem_gb()
     is_transformer = "transformer" in model_name.lower()
 
-    if max_len >= 8192:
-        if is_transformer:
-            # Transformer at 8K: ~19 GB per sample in training.
-            # micro_batch=2 ≈ 38 GB (fits A40 48GB with overhead).
-            return {"micro_batch": 2, "grad_accum_steps": max(1, base_batch // 2), "eval_batch": 2}
-        else:
-            # PRISM at 8K: ~0.5 GB per sample. Very comfortable.
-            return {"micro_batch": min(base_batch, 8), "grad_accum_steps": 1, "eval_batch": 8}
-    elif max_len >= 4096:
-        if is_transformer:
-            return {"micro_batch": 4, "grad_accum_steps": max(1, base_batch // 4), "eval_batch": 4}
-        else:
-            return {"micro_batch": min(base_batch, 8), "grad_accum_steps": 1, "eval_batch": 8}
-    elif max_len >= 2048:
-        if is_transformer:
-            return {"micro_batch": 8, "grad_accum_steps": max(1, base_batch // 8), "eval_batch": 8}
-        else:
-            return {"micro_batch": min(base_batch, 16), "grad_accum_steps": 1, "eval_batch": 16}
+    # Empirical training memory per sample (MB, fp32, fwd+bwd) from A100 benchmarks.
+    # These are conservative estimates including activations + optimizer states.
+    # Transformer: O(n^2) attention dominates at long sequences.
+    # PRISM: O(n) recurrence, memory grows linearly.
+    if is_transformer:
+        # Approximate MB per sample for training (fwd+bwd):
+        # 512: ~50, 2048: ~1200, 4096: ~5000, 8192: ~20000
+        mem_per_sample = {512: 50, 1024: 170, 2048: 1200, 4096: 5000, 8192: 20000}
     else:
-        return {"micro_batch": base_batch, "grad_accum_steps": 1, "eval_batch": base_batch}
+        # PRISM is much lighter:
+        # 512: ~35, 2048: ~135, 4096: ~270, 8192: ~540
+        mem_per_sample = {512: 35, 1024: 70, 2048: 135, 4096: 270, 8192: 540}
+
+    # Interpolate/extrapolate for the target max_len
+    lengths = sorted(mem_per_sample.keys())
+    if max_len <= lengths[0]:
+        per_sample_mb = mem_per_sample[lengths[0]]
+    elif max_len >= lengths[-1]:
+        per_sample_mb = mem_per_sample[lengths[-1]]
+    else:
+        # Linear interpolation between bracketing lengths
+        for i in range(len(lengths) - 1):
+            if lengths[i] <= max_len <= lengths[i + 1]:
+                lo, hi = lengths[i], lengths[i + 1]
+                frac = (max_len - lo) / (hi - lo)
+                per_sample_mb = mem_per_sample[lo] + frac * (mem_per_sample[hi] - mem_per_sample[lo])
+                break
+
+    # Reserve ~4 GB for model params + optimizer states + overhead
+    available_mb = max(1000, gpu_mem * 1024 - 4000) if gpu_mem > 0 else 8000
+
+    # Max micro-batch that fits in memory
+    max_micro = max(1, int(available_mb / per_sample_mb))
+
+    # Desired effective batch (what we'd use if memory were unlimited)
+    desired_effective = base_batch
+
+    # micro_batch = min of what fits and what we want
+    micro_batch = min(max_micro, desired_effective)
+
+    # Gradient accumulation to reach the desired effective batch
+    grad_accum_steps = max(1, desired_effective // micro_batch)
+
+    # Eval is inference-only (~3x cheaper than training), so we can use bigger batches
+    eval_batch = min(max_micro * 3, desired_effective * 2)
+
+    return {
+        "micro_batch": micro_batch,
+        "grad_accum_steps": grad_accum_steps,
+        "eval_batch": eval_batch,
+        "_gpu_mem_gb": round(gpu_mem, 1),
+        "_per_sample_mb": round(per_sample_mb),
+        "_max_micro_fit": max_micro,
+    }
 
 
 def run_phase_1(
