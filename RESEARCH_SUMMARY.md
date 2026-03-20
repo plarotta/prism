@@ -275,6 +275,7 @@ PRISM at 2048 outperforms M2-BERT-80M-8K despite 4x fewer parameters and no pret
 - Attentive covariance pooling as a quality driver — harmful in original form (-3.4 MRR at short seq), still harmful after V2 fixes (-15.6 MRR at best)
 - The "implementation bug" hypothesis for component failure — seven targeted fixes addressing every identified numerical issue failed to close the gap
 - Learned decay rates providing any benefit over fixed geometric spacing
+- Geometric decay spacing as the optimal inductive bias — all-slow (λ=0.99) beats geometric by +7.2 nDCG@10 on LoCoV1 at 2K. Multi-scale frequency decomposition hurts for document-level retrieval.
 
 **Definitively ruled out as fixes for the 8K < 2K gap:**
 - Attentive pooling — only +1.8 nDCG@10 at 8K, slightly hurts at 2K (-1.7). Pooling is not the bottleneck.
@@ -284,8 +285,9 @@ PRISM at 2048 outperforms M2-BERT-80M-8K despite 4x fewer parameters and no pret
 - Whether pretraining (MLM on C4/Wikipedia) would close the 2K→8K gap for PRISM and make the 8K results competitive with or better than 2K
 - Whether the LoCoV1 results would hold under a zero-shot evaluation protocol (pretrain + fine-tune on separate retrieval data, evaluate on LoCoV1)
 - Whether the novel components might help at larger scale where the model has more capacity to learn cross-channel interactions
-- **Whether geometric decay spacing is a meaningful inductive bias vs linear/random** (Experiment 4, pending)
 - Whether wider channels or more channels would close the 8K < 2K gap (backbone capacity hypothesis)
+- Whether the all-slow advantage holds at 8K (where global context could cause more dilution) or at larger model scales
+- Whether the all-slow result generalizes to tasks that require local feature matching (e.g., short-query retrieval, NER)
 
 ## 7b. Phase 6: Hybrid Architecture Experiments
 
@@ -315,9 +317,21 @@ Tested whether replacing mean pooling with a learned attentive query vector fixe
 
 Multi-head pooling and local attention hybrid skipped — the marginal pooling gains don't justify further exploration in that direction.
 
-### Experiment 4: Decay Spacing Ablation (pending)
+### Experiment 4: Decay Spacing Ablation (complete)
 
-Tests geometric vs linear vs random vs all-slow vs all-fast decay spacing at max_len=2048. Results pending.
+Tested whether geometric decay spacing is a meaningful inductive bias. All variants at max_len=2048, 5000 steps, mean pooling.
+
+| Decay Mode | Avg nDCG@10 | vs Geometric |
+|------------|-------------|--------------|
+| **All-slow (λ=0.99)** | **0.764** | **+7.2 pts** |
+| Geometric (default) | 0.692 | — |
+| Linear | 0.654 | -3.8 pts |
+| Random | 0.641 | -5.1 pts |
+| All-fast (λ=0.1) | ~0.26 @1K | discontinued |
+
+**Result: geometric spacing is suboptimal. All-slow wins decisively.** For document-level retrieval, maximum global context in every channel beats multi-scale decomposition. The fast-decay channels in geometric spacing waste capacity on local features that don't help. The input gating mechanism learns to differentiate channels without needing different base decay rates.
+
+All-slow also converges faster — it leads at every checkpoint from step 1000 onward, reaching 0.360 at step 1000 vs geometric's 0.251.
 
 ## 8. Current State and Next Steps
 
@@ -327,52 +341,60 @@ The architecture that works is simpler than what we designed:
 
 ```
 PRISM-Simplified = Embedding
-                 → Frequency-stratified projection (C channels)
-                 → Fixed-rate gated linear recurrence (geometric decay rates)
+                 → Channel projection (C channels)
+                 → Fixed-rate gated linear recurrence (all λ=0.99)
                  → Bidirectional gated fusion
                  → Mean pooling
                  → LayerNorm
 ```
 
-No interference. No covariance pooling. Attentive pooling tested and provides marginal benefit at 8K (+1.8 pts) but slightly hurts at 2K — mean pooling remains the default.
+No interference. No covariance pooling. No geometric decay spacing — uniform slow decay across all channels. The input gating learns to differentiate channels without needing different base rates.
 
-> A bidirectional multi-channel state-space encoder with fixed geometric decay rates beats a parameter-matched Transformer on embedding quality at sequences beyond ~256 tokens, with O(n) scaling, 2x+ inference speedup at 2K+ tokens, and order-of-magnitude memory savings.
+> A bidirectional multi-channel state-space encoder with uniform slow decay rates and mean pooling beats a parameter-matched Transformer on embedding quality at sequences beyond ~256 tokens, with O(n) scaling, 2x+ inference speedup at 2K+ tokens, and order-of-magnitude memory savings.
 
-### Updated best results (with LR sweep + 7000 steps)
+### Updated best results
 
-| Model | max_len | Avg nDCG@10 |
-|-------|---------|-------------|
-| **PRISM-MeanPool** | **2048** | **0.770** |
-| PRISM-Attentive | 8192 | 0.692 |
-| PRISM-MeanPool | 8192 | 0.675 |
-| Transformer (tuned) | 2048 | 0.672 |
-| M2-BERT-80M (8K) | 8192 | ~0.506 |
-| BM25 | — | ~0.486 |
+| Model | max_len | Decay | Steps | Avg nDCG@10 |
+|-------|---------|-------|-------|-------------|
+| **PRISM-AllSlow** | **2048** | **λ=0.99** | **5000** | **0.764** |
+| PRISM-MeanPool | 2048 | geometric | 7000 | 0.770* |
+| PRISM-Attentive | 8192 | geometric | 7000 | 0.692 |
+| PRISM-Geometric | 2048 | geometric | 5000 | 0.692 |
+| PRISM-MeanPool | 8192 | geometric | 7000 | 0.675 |
+| Transformer (tuned) | 2048 | — | 7000 | 0.672 |
+| M2-BERT-80M (8K) | 8192 | — | — | ~0.506 |
+| BM25 | — | — | — | ~0.486 |
 
-PRISM advantage over the tuned Transformer: +9.8 nDCG@10 points at 2K. The gap is smaller than the +49.4 from Phase 5 (which was inflated by a bad Transformer LR), but still substantial and consistent across all 12 tasks.
+*PRISM-MeanPool at 7000 steps (0.770) vs PRISM-AllSlow at 5000 steps (0.764) — all-slow would likely match or exceed 0.770 with 2000 more steps, given it was still climbing at step 5000.
+
+PRISM advantage over the tuned Transformer: +9.2 to +9.8 nDCG@10 points at 2K depending on configuration.
 
 ### The 8K < 2K gap: diagnosis updated
 
 The pooling hypothesis has been tested and ruled out as the primary cause. Attentive pooling confirms mean pooling dilution is real but minor (~1.8 pts). The remaining gap (~7.8 pts) points to backbone capacity: a 384-dim hidden state across 6 layers cannot compress 8K tokens of real language as effectively as it handles 2K. Likely fixes: wider channels, more channels, or pretraining on long sequences.
 
-### Immediate next step
+### Immediate next steps
 
-Experiment 4 results (decay spacing ablation) pending. This tests whether geometric spacing is a genuine inductive bias — a core scientific claim for the architecture.
+- Run PRISM-AllSlow at 7000 steps to get an apples-to-apples comparison with the 0.770 geometric baseline
+- Consider running all-slow at 8K to see if it also helps the long-context case
+- Reassess what differentiates PRISM from a generic multi-channel SSM now that geometric spacing is disproven
 
 ### What a paper would need
 
-1. **Validate geometric decay as inductive bias.** Experiment 4 (pending). Key for differentiating from M2-BERT.
+1. **Reframe the architecture narrative.** The geometric decay story is dead. The new claim is: uniform slow-decay multi-channel recurrence with learned input gating is a simple, effective architecture for long-document embeddings. The gating mechanism, not the decay spacing, is doing the differentiation work.
 
 2. **Fair comparison with M2-BERT.** Current LoCoV1 results are strong but the training protocol differs (we train on LoCoV1 pairs; M2-BERT is evaluated zero-shot). Implementing the pretrain → fine-tune → zero-shot eval pipeline would make this comparison rigorous.
 
-3. **Address the 8K < 2K gap.** Pooling fixes are exhausted. Next directions: wider/deeper backbone, pretraining on long sequences, or accepting that 2K truncation is the right operating point for this model scale.
+3. **Address the 8K < 2K gap.** Pooling fixes are exhausted. Next directions: wider/deeper backbone, pretraining on long sequences, or accepting that 2K truncation is the right operating point for this model scale. All-slow at 8K is worth testing.
 
 4. **Scale sensitivity.** All experiments use ~20M parameter models. At least one experiment at 100M+ would show whether findings hold.
 
 ### The negative results are also valuable
 
-Two clean negative results worth documenting:
+Three clean negative results worth documenting:
 
 1. **V2 ablation study:** Theoretically motivated components (cross-scale interference, covariance pooling) failed despite careful diagnosis and targeted fixes. The failure pattern — inert at short sequences, catastrophic at long sequences — suggests these mechanisms require either much larger model scale or fundamentally different formulations.
 
 2. **Attentive pooling:** A reasonable hypothesis (mean pooling dilution causes the 8K < 2K gap) tested cleanly and shown to be a minor factor. The bottleneck is backbone capacity, not pooling.
+
+3. **Geometric decay spacing:** The supposed core inductive bias of the architecture is suboptimal. All-slow (λ=0.99) beats geometric by +7.2 nDCG@10 points on LoCoV1. Multi-scale frequency decomposition is not needed for document-level retrieval — the gating mechanism learns to differentiate channels on its own.

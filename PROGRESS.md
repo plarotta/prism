@@ -302,10 +302,29 @@ Replaced mean pooling with a single learned query vector (AttentivePooling). Tes
 
 Multi-head pooling (Exp 2) and local attention hybrid (Exp 3) skipped — the ~1.8 point delta from attentive pooling is too small to justify further pooling exploration. The bottleneck is in the recurrence backbone, not the pooling stage.
 
-### Experiment 4: Decay Spacing Ablation (pending)
+### Experiment 4: Decay Spacing Ablation (complete)
 
-Tests whether geometric decay spacing is a meaningful inductive bias:
-- Geometric (current), Linear, Random fixed, All-slow (λ=0.99), All-fast (λ=0.1)
+Tests whether geometric decay spacing is a meaningful inductive bias. All runs at max_len=2048, 5000 steps, mean pooling.
+
+| Decay Mode | λ values | Avg nDCG@10 | vs Geometric |
+|------------|----------|-------------|--------------|
+| **All-slow** | **all 0.99** | **0.764** | **+7.2 pts** |
+| Geometric (default) | log-spaced | 0.692 | — |
+| Linear | evenly spaced | 0.654 | -3.8 pts |
+| Random | uniform random | 0.641 | -5.1 pts |
+| All-fast | all 0.1 | ~0.26 @1K | discontinued |
+
+**This is a surprising and important result.** Geometric decay spacing — the supposed core inductive bias — is *not* optimal. All-slow (λ=0.99 across all channels) wins by +7.2 nDCG@10 points. For document-level retrieval at 2K tokens, maximum global context in every channel beats multi-scale frequency decomposition. The input gating learns to differentiate channels without needing different base decay rates.
+
+Convergence trajectories show all-slow leads at every checkpoint:
+
+| Step | All-slow | Geometric | Linear | Random |
+|------|----------|-----------|--------|--------|
+| 1000 | **0.360** | 0.251 | 0.255 | 0.251 |
+| 2000 | **0.487** | 0.395 | 0.392 | 0.389 |
+| 3000 | **0.619** | 0.556 | 0.537 | 0.532 |
+| 4000 | **0.729** | 0.650 | 0.619 | 0.611 |
+| 5000 | **0.764** | 0.692 | 0.654 | 0.641 |
 
 ---
 
