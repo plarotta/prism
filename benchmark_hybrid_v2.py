@@ -259,6 +259,7 @@ def train_niah(
     log_interval=100,
     eval_fn=None,
     eval_interval=1000,
+    memory_warmup_steps=0,
 ):
     """Train with InfoNCE on NIAH query-document pairs.
 
@@ -267,8 +268,22 @@ def train_niah(
         train_queries: list of token ID lists (queries about needles)
         eval_fn: optional callable() -> dict for periodic evaluation
         eval_interval: evaluate every N steps
+        memory_warmup_steps: freeze memory modules for first N steps (HybridPRISM only)
     """
-    optimizer = torch.optim.AdamW(model_wrapper.parameters(), lr=lr, weight_decay=0.01)
+    # Detect HybridPRISM and freeze memory during warmup
+    from hybrid_prism import HybridPRISMEncoder
+    encoder = getattr(model_wrapper, "encoder", None)
+    has_memory = isinstance(encoder, HybridPRISMEncoder)
+
+    if has_memory and memory_warmup_steps > 0:
+        encoder.set_memory_frozen(True)
+        print(f"  Memory frozen for first {memory_warmup_steps} steps")
+
+    # Only optimize params that currently require grad
+    optimizer = torch.optim.AdamW(
+        [p for p in model_wrapper.parameters() if p.requires_grad],
+        lr=lr, weight_decay=0.01,
+    )
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=n_steps, eta_min=1e-5
     )
@@ -283,6 +298,17 @@ def train_niah(
     t0 = time.perf_counter()
 
     for step in range(n_steps):
+        # Unfreeze memory after warmup
+        if has_memory and memory_warmup_steps > 0 and step == memory_warmup_steps:
+            encoder.set_memory_frozen(False)
+            # Re-add memory params to optimizer now that they require grad
+            optimizer.add_param_group({
+                "params": list(encoder.memory_params()),
+                "lr": lr,
+                "weight_decay": 0.01,
+            })
+            print(f"  [{model_name}] Memory unfrozen at step {step}")
+
         optimizer.zero_grad()
 
         # Sample batch
@@ -408,6 +434,7 @@ def run_experiment_niah(
     lr=3e-4,
     seed=42,
     only_models=None,
+    memory_warmup_steps=500,
 ):
     """Run NIAH experiment at a single sequence length.
 
@@ -475,6 +502,7 @@ def run_experiment_niah(
                 n_steps=n_steps, model_name=model_name, max_len=max_len,
                 micro_batch=micro_batch, lr=lr,
                 eval_fn=eval_fn, eval_interval=1000,
+                memory_warmup_steps=memory_warmup_steps,
             )
 
             # Final evaluation
@@ -750,6 +778,8 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--models", type=str, default=None,
                         help="Comma-separated model names to run (default: all)")
+    parser.add_argument("--memory-warmup", type=int, default=500,
+                        help="Steps to freeze memory modules (HybridPRISM only, default: 500)")
     args = parser.parse_args()
 
     only_models = args.models.split(",") if args.models else None
@@ -762,6 +792,7 @@ if __name__ == "__main__":
             lr=args.lr,
             seed=args.seed,
             only_models=only_models,
+            memory_warmup_steps=args.memory_warmup,
         )
 
     if args.experiment in ("scaling", "all"):

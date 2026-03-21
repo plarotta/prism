@@ -122,3 +122,11 @@ Log any deviations from the original plan here, with rationale.
 Without LayerNorm, memory stays at std≈0.02 — small enough that early MemoryRead contributions are negligible, letting the PRISM backbone escape the saddle normally.
 
 **Fix:** Removed LayerNorm from MemoryWrite. Pure gated update: `return gate * memory + (1-gate) * retrieved`. Both memory modules now have no LayerNorm, consistent with the principle: no extra normalization between PRISM groups.
+
+### Issue 3: HybridPRISM learning ~8x slower than AllSlow-12L after LayerNorm fixes (2026-03-21)
+
+**Symptom:** After removing both LayerNorms, HybridPRISM-12L no longer collapses but learns very slowly. At step 3000: loss=2.6230 vs AllSlow-12L loss=1.6041. Also a loss spike to 2.8823 at step 1100.
+
+**Root cause:** Gradient clipping dilution. `clip_grad_norm_` clips the global norm across ALL parameters. Memory modules (~2.7M params) get gradients but don't contribute to output (ReZero init). Their gradient norm inflates the denominator, effectively reducing the PRISM backbone's learning rate vs AllSlow-12L which has no memory overhead.
+
+**Fix:** Memory warmup — freeze memory params for first 500 steps. During warmup, PRISM backbone trains identically to AllSlow-12L (full gradient budget). After warmup, backbone is functional and memory has useful representations to learn from. Added `set_memory_frozen()` to HybridPRISMEncoder and `--memory-warmup` CLI arg (default 500).

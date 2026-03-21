@@ -261,6 +261,19 @@ class HybridPRISMEncoder(nn.Module):
         nn.init.normal_(self.token_emb.weight, std=0.02)
         nn.init.normal_(self.pos_emb.weight, std=0.02)
 
+    def memory_params(self):
+        """Yield all memory-related parameters (for separate LR groups / freezing)."""
+        yield self.memory_init
+        yield from self.mem_writes.parameters()
+        yield from self.mem_reads.parameters()
+
+    def set_memory_frozen(self, frozen: bool):
+        """Freeze or unfreeze memory modules (for warmup)."""
+        self.memory_init.requires_grad_(not frozen)
+        for m in list(self.mem_writes) + list(self.mem_reads):
+            for p in m.parameters():
+                p.requires_grad_(not frozen)
+
     def forward(
         self,
         input_ids: Tensor,
