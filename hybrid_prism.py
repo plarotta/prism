@@ -260,6 +260,20 @@ class HybridPRISMEncoder(nn.Module):
     def _init_weights(self):
         nn.init.normal_(self.token_emb.weight, std=0.02)
         nn.init.normal_(self.pos_emb.weight, std=0.02)
+        # Zero all Linear biases except recurrence gates and memory write
+        # gates (matches PRISMEncoder init; preserves gate_proj bias=+2.0)
+        skip = set()
+        for group in self.groups:
+            for layer in group:
+                skip.update(layer.recurrence.gates_fwd)
+                if layer.bidirectional:
+                    skip.update(layer.recurrence.gates_bwd)
+        for mw in self.mem_writes:
+            skip.add(mw.gate_proj)
+        for module in self.modules():
+            if isinstance(module, nn.Linear) and module.bias is not None:
+                if module not in skip:
+                    nn.init.zeros_(module.bias)
 
     def memory_params(self):
         """Yield all memory-related parameters (for separate LR groups / freezing)."""

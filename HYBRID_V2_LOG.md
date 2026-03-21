@@ -129,4 +129,8 @@ Without LayerNorm, memory stays at std≈0.02 — small enough that early Memory
 
 **Root cause:** Gradient clipping dilution. `clip_grad_norm_` clips the global norm across ALL parameters. Memory modules (~2.7M params) get gradients but don't contribute to output (ReZero init). Their gradient norm inflates the denominator, effectively reducing the PRISM backbone's learning rate vs AllSlow-12L which has no memory overhead.
 
-**Fix:** Memory warmup — freeze memory params for first 500 steps. During warmup, PRISM backbone trains identically to AllSlow-12L (full gradient budget). After warmup, backbone is functional and memory has useful representations to learn from. Added `set_memory_frozen()` to HybridPRISMEncoder and `--memory-warmup` CLI arg (default 500).
+**Initial fix attempt:** Memory warmup (freeze memory for 500 steps). Did NOT help — loss trajectory during frozen period was identical to unfrozen run. Gradient clipping dilution was not the primary cause.
+
+**Actual root cause:** `HybridPRISMEncoder._init_weights` only initialized embeddings. `PRISMEncoder._init_weights` also zeros all `nn.Linear` biases (except recurrence gates). This means every projection, MLP, and fusion layer in HybridPRISM started with random biases (PyTorch Kaiming default) instead of zeros — a completely different optimization starting point from AllSlow-12L.
+
+**Fix:** Added bias zeroing to `HybridPRISMEncoder._init_weights`, matching `PRISMEncoder`. Excludes recurrence gates and MemoryWrite gate_proj (preserves bias=+2.0). Also kept memory warmup infrastructure (may still be useful later).
