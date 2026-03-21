@@ -1,0 +1,81 @@
+--- AllSlow-PRISM-6L ---
+  Parameters: 19,193,088 (19.2M)
+
+Training AllSlow-PRISM-6L (3000 steps, max_len=2048, micro_batch=16, lr=3e-04, 5000 pairs)...
+  [AllSlow-PRISM-6L] Step 100/3000  loss=2.7775  (84.2s)
+  [AllSlow-PRISM-6L] Step 200/3000  loss=2.7511  (168.0s)
+  [AllSlow-PRISM-6L] Step 300/3000  loss=2.7261  (251.9s)
+  [AllSlow-PRISM-6L] Step 400/3000  loss=2.6566  (335.8s)
+  [AllSlow-PRISM-6L] Step 500/3000  loss=2.6257  (419.7s)
+  [AllSlow-PRISM-6L] Step 600/3000  loss=2.5386  (503.7s)
+  [AllSlow-PRISM-6L] Step 700/3000  loss=2.4483  (587.7s)
+  [AllSlow-PRISM-6L] Step 800/3000  loss=2.4326  (671.6s)
+  [AllSlow-PRISM-6L] Step 900/3000  loss=2.2934  (755.5s)
+  [AllSlow-PRISM-6L] Step 1000/3000  loss=2.2218  (839.4s)
+  [AllSlow-PRISM-6L] Eval @1000: MRR=0.0149 R@1=0.0020
+  [AllSlow-PRISM-6L] Step 1100/3000  loss=2.1423  (934.0s)
+   [AllSlow-PRISM-6L] Step 1200/3000  loss=2.0276  (1017.9s)
+  [AllSlow-PRISM-6L] Step 1300/3000  loss=2.0100  (1101.8s)
+  [AllSlow-PRISM-6L] Step 1400/3000  loss=1.8954  (1185.7s)
+  [AllSlow-PRISM-6L] Step 1500/3000  loss=1.8091  (1269.6s)
+  [AllSlow-PRISM-6L] Step 1600/3000  loss=1.6574  (1353.5s)
+  [AllSlow-PRISM-6L] Step 1700/3000  loss=1.6347  (1437.4s)
+  [AllSlow-PRISM-6L] Step 1800/3000  loss=1.4957  (1521.3s)
+  [AllSlow-PRISM-6L] Step 1900/3000  loss=1.4449  (1605.3s)
+  [AllSlow-PRISM-6L] Step 2000/3000  loss=1.3864  (1689.2s)
+  [AllSlow-PRISM-6L] Eval @2000: MRR=0.0142 R@1=0.0020
+  [AllSlow-PRISM-6L] Step 2100/3000  loss=1.2778  (1783.8s)
+  [AllSlow-PRISM-6L] Step 2200/3000  loss=1.1800  (1867.8s)
+  [AllSlow-PRISM-6L] Step 2300/3000  loss=1.1421  (1951.8s)
+  [AllSlow-PRISM-6L] Step 2400/3000  loss=1.0555  (2035.7s)
+  [AllSlow-PRISM-6L] Step 2500/3000  loss=1.1038  (2119.7s)
+  [AllSlow-PRISM-6L] Step 2600/3000  loss=0.9667  (2203.6s)
+  [AllSlow-PRISM-6L] Step 2700/3000  loss=0.9062  (2287.6s)
+  [AllSlow-PRISM-6L] Step 2800/3000  loss=0.9487  (2371.5s)
+  [AllSlow-PRISM-6L] Step 2900/3000  loss=0.8703  (2455.5s)
+  [AllSlow-PRISM-6L] Step 3000/3000  loss=0.8493  (2539.4s)
+  [AllSlow-PRISM-6L] Eval @3000: MRR=0.0144 R@1=0.0000
+  [AllSlow-PRISM-6L] Training complete in 2550.0s
+
+  AllSlow-PRISM-6L FINAL: MRR=0.0144  R@1=0.0000  R@5=0.0140  loss=0.8493  time=2550s
+
+  --- AllSlow-PRISM-12L ---
+      meters: 25,704,192 (25.7M)                                                                                                                                                                                [8/96]
+                                                                                                                                                                                                                [7/96]
+      ng AllSlow-PRISM-12L (3000 steps, max_len=2048, micro_batch=16, lr=3e-04, 5000 pairs)...                                                                                                                  [6/96]
+      Slow-PRISM-12L] Step 100/3000  loss=2.7862  (166.6s)                                                                                                                                                      [5/96]
+      Slow-PRISM-12L] Step 200/3000  loss=2.7721  (333.2s)                                                                                                                                                      [4/96]
+      Slow-PRISM-12L] Step 300/3000  loss=2.7689  (499.7s)                                                                                                                                                      [3/96]
+      Slow-PRISM-12L] Step 400/3000  loss=2.7456  (666.2s)                                                                                                                                                      [2/96]
+      Slow-PRISM-12L] Step 500/3000  loss=2.7147  (832.8s)                                                                                                                                                      [1/96]
+      Slow-PRISM-12L] Step 600/3000  loss=2.6798  (999.3s)                                                                                                                                                      [0/96]
+  [AllSlow-PRISM-12L] Step 700/3000  loss=2.6437  (1166.1s)
+  [AllSlow-PRISM-12L] Step 800/3000  loss=2.5811  (1332.6s)
+  [AllSlow-PRISM-12L] Step 900/3000  loss=2.5254  (1499.2s)
+  [AllSlow-PRISM-12L] Step 1000/3000  loss=2.4766  (1665.7s)
+  [AllSlow-PRISM-12L] Eval @1000: MRR=0.0158 R@1=0.0040
+  [AllSlow-PRISM-12L] Step 1100/3000  loss=2.3576  (1853.2s)
+  [AllSlow-PRISM-12L] Step 1200/3000  loss=2.3778  (2019.6s)
+  [AllSlow-PRISM-12L] Step 1300/3000  loss=2.3113  (2186.2s)
+  [AllSlow-PRISM-12L] Step 1400/3000  loss=2.2783  (2352.8s)
+  [AllSlow-PRISM-12L] Step 1500/3000  loss=2.2474  (2519.4s)
+  [AllSlow-PRISM-12L] Step 1600/3000  loss=2.1828  (2686.2s)
+  [AllSlow-PRISM-12L] Step 1700/3000  loss=2.0950  (2852.7s)
+  [AllSlow-PRISM-12L] Step 1800/3000  loss=2.0343  (3019.3s)
+  [AllSlow-PRISM-12L] Step 1900/3000  loss=1.9806  (3185.8s)
+  [AllSlow-PRISM-12L] Step 2000/3000  loss=1.9642  (3352.3s)
+  [AllSlow-PRISM-12L] Eval @2000: MRR=0.0162 R@1=0.0060
+  [AllSlow-PRISM-12L] Step 2100/3000  loss=1.9259  (3539.9s)
+  [AllSlow-PRISM-12L] Step 2200/3000  loss=1.8665  (3706.5s)
+  [AllSlow-PRISM-12L] Step 2300/3000  loss=1.8229  (3873.0s)
+  [AllSlow-PRISM-12L] Step 2400/3000  loss=1.7573  (4039.6s)
+  [AllSlow-PRISM-12L] Step 2500/3000  loss=1.7360  (4206.4s)
+  [AllSlow-PRISM-12L] Step 2600/3000  loss=1.7299  (4372.9s)
+  [AllSlow-PRISM-12L] Step 2700/3000  loss=1.6830  (4539.5s)
+  [AllSlow-PRISM-12L] Step 2800/3000  loss=1.6527  (4706.1s)
+  [AllSlow-PRISM-12L] Step 2900/3000  loss=1.6251  (4872.6s)
+  [AllSlow-PRISM-12L] Step 3000/3000  loss=1.6041  (5039.2s)
+  [AllSlow-PRISM-12L] Eval @3000: MRR=0.0135 R@1=0.0000
+  [AllSlow-PRISM-12L] Training complete in 5060.2s
+
+  AllSlow-PRISM-12L FINAL: MRR=0.0135  R@1=0.0000  R@5=0.0100  loss=1.6041  time=5060s

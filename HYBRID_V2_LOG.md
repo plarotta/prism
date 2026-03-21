@@ -89,4 +89,10 @@ Log any deviations from the original plan here, with rationale.
 
 ## Issues & Debugging
 
-Log blockers, bugs, and how they were resolved.
+### Issue 1: HybridPRISM loss stuck at ln(batch_size) — model collapse (2026-03-21)
+
+**Symptom:** HybridPRISM-12L loss flat at 2.7726 = ln(16) from step ~200 onwards. Model producing identical embeddings for all inputs. AllSlow-6L and AllSlow-12L trained normally.
+
+**Root cause:** MemoryRead had a LayerNorm wrapping the residual: `output = LayerNorm(x + out_proj(retrieved))`. At init (ReZero, out_proj=0), this became `LayerNorm(x)` — an extra normalization between PRISM groups that disrupted gradient flow and caused the model to get stuck at a saddle point.
+
+**Fix:** Removed LayerNorm from MemoryRead. Pure residual: `output = x + out_proj(retrieved)`. At init this is exactly identity. Verified loss decreases on local smoke test.

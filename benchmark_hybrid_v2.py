@@ -407,6 +407,7 @@ def run_experiment_niah(
     micro_batch=16,
     lr=3e-4,
     seed=42,
+    only_models=None,
 ):
     """Run NIAH experiment at a single sequence length.
 
@@ -443,6 +444,10 @@ def run_experiment_niah(
         ("Transformer-8L", lambda: build_transformer(max_len=max_len),
          TransformerForEmbedding),
     ]
+
+    # Filter models if requested
+    if only_models:
+        models = [(n, b, w) for n, b, w in models if n in only_models]
 
     for model_name, build_fn, WrapperClass in models:
         print(f"\n--- {model_name} ---")
@@ -738,7 +743,11 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=3e-4,
                         help="Learning rate")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--models", type=str, default=None,
+                        help="Comma-separated model names to run (default: all)")
     args = parser.parse_args()
+
+    only_models = args.models.split(",") if args.models else None
 
     if args.experiment in ("niah", "all"):
         run_experiment_niah(
@@ -747,6 +756,7 @@ if __name__ == "__main__":
             micro_batch=args.micro_batch,
             lr=args.lr,
             seed=args.seed,
+            only_models=only_models,
         )
 
     if args.experiment in ("scaling", "all"):

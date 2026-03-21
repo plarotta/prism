@@ -101,8 +101,9 @@ class MemoryRead(nn.Module):
     """Cross-attention: tokens attend to memory slots.
 
     Each token queries the memory bank and retrieves relevant stored information.
-    Uses pre-norm residual with ReZero-initialized output projection so the
+    Uses a pure residual with ReZero-initialized output projection so the
     residual stream passes through unchanged at initialization.
+    No LayerNorm -- avoids disrupting gradient flow between PRISM groups.
 
     Complexity: O(n * k * d) -- linear in n for fixed k.
     """
@@ -123,7 +124,6 @@ class MemoryRead(nn.Module):
         nn.init.zeros_(self.out_proj.weight)
         nn.init.zeros_(self.out_proj.bias)
 
-        self.norm = nn.LayerNorm(d)
         self.dropout = nn.Dropout(dropout)
 
     def forward(
@@ -156,7 +156,8 @@ class MemoryRead(nn.Module):
         retrieved = torch.matmul(attn, V)
         retrieved = retrieved.transpose(1, 2).reshape(B, n, d)
 
-        output = self.norm(token_states + self.out_proj(retrieved))
+        # Pure residual -- no LayerNorm to avoid disrupting gradient flow
+        output = token_states + self.out_proj(retrieved)
 
         return output
 
