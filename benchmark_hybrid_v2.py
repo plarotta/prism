@@ -276,8 +276,8 @@ def train_niah(
     has_memory = isinstance(encoder, HybridPRISMEncoder)
 
     if has_memory and memory_warmup_steps > 0:
-        encoder.set_memory_frozen(True)
-        print(f"  Memory frozen for first {memory_warmup_steps} steps")
+        encoder.set_memory_enabled(False)
+        print(f"  Memory disabled for first {memory_warmup_steps} steps")
 
     # Only optimize params that currently require grad
     optimizer = torch.optim.AdamW(
@@ -300,14 +300,14 @@ def train_niah(
     for step in range(n_steps):
         # Unfreeze memory after warmup
         if has_memory and memory_warmup_steps > 0 and step == memory_warmup_steps:
-            encoder.set_memory_frozen(False)
-            # Re-add memory params to optimizer now that they require grad
+            encoder.set_memory_enabled(True)
+            # Add memory params to optimizer now that they require grad
             optimizer.add_param_group({
                 "params": list(encoder.memory_params()),
                 "lr": lr,
                 "weight_decay": 0.01,
             })
-            print(f"  [{model_name}] Memory unfrozen at step {step}")
+            print(f"  [{model_name}] Memory enabled at step {step}")
 
         optimizer.zero_grad()
 

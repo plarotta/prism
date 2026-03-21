@@ -258,8 +258,15 @@ class HybridPRISMEncoder(nn.Module):
                     layer.interference_bwd = NoInterference(layer.d_c, layer.n_channels)
 
     def _init_weights(self):
+        # Save and restore RNG state so embedding init is independent of
+        # how many modules were created before this point.  This ensures
+        # the PRISM backbone starts from the same initialisation as a
+        # plain PRISMEncoder with the same seed.
+        rng_state = torch.random.get_rng_state()
+        torch.manual_seed(0xBEEF)  # fixed seed for embeddings
         nn.init.normal_(self.token_emb.weight, std=0.02)
         nn.init.normal_(self.pos_emb.weight, std=0.02)
+        torch.random.set_rng_state(rng_state)
         # Zero all Linear biases except recurrence gates and memory write
         # gates (matches PRISMEncoder init; preserves gate_proj bias=+2.0)
         skip = set()
@@ -281,12 +288,20 @@ class HybridPRISMEncoder(nn.Module):
         yield from self.mem_writes.parameters()
         yield from self.mem_reads.parameters()
 
-    def set_memory_frozen(self, frozen: bool):
-        """Freeze or unfreeze memory modules (for warmup)."""
-        self.memory_init.requires_grad_(not frozen)
+    def set_memory_enabled(self, enabled: bool):
+        """Enable or disable memory modules entirely.
+
+        When disabled, forward pass skips memory write/read (no dropout,
+        no computation, no RNG perturbation). PRISM backbone behaves
+        identically to a flat AllSlow encoder.
+        """
+        self._memory_enabled = enabled
+        # Also freeze/unfreeze params to match
+        frozen = not enabled
+        self.memory_init.requires_grad_(enabled)
         for m in list(self.mem_writes) + list(self.mem_reads):
             for p in m.parameters():
-                p.requires_grad_(not frozen)
+                p.requires_grad_(enabled)
 
     def forward(
         self,
@@ -314,7 +329,9 @@ class HybridPRISMEncoder(nn.Module):
         x = x * mask_bool.unsqueeze(-1).float()
 
         # Initialize memory bank for this batch
-        memory = self.memory_init.unsqueeze(0).expand(B, -1, -1)
+        use_memory = getattr(self, "_memory_enabled", True)
+        if use_memory:
+            memory = self.memory_init.unsqueeze(0).expand(B, -1, -1)
 
         # Process groups with memory interactions between them
         for i, group in enumerate(self.groups):
@@ -323,7 +340,7 @@ class HybridPRISMEncoder(nn.Module):
                 x = x * mask_bool.unsqueeze(-1).float()
 
             # Memory write/read between groups (not after the last group)
-            if i < len(self.groups) - 1:
+            if use_memory and i < len(self.groups) - 1:
                 memory = self.mem_writes[i](memory, x, mask_bool)
                 x = self.mem_reads[i](x, memory, mask_bool)
                 x = x * mask_bool.unsqueeze(-1).float()
