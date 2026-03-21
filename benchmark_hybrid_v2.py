@@ -541,6 +541,7 @@ def run_experiment_scaling(
     micro_batch=16,
     lr=3e-4,
     seed=42,
+    only_models=None,
 ):
     """Run NIAH at multiple sequence lengths and plot scaling curves.
 
@@ -562,6 +563,10 @@ def run_experiment_scaling(
         ("Transformer-8L", lambda ml: build_transformer(max_len=ml),
          TransformerForEmbedding),
     ]
+
+    # Filter models if requested
+    if only_models:
+        model_configs = [(n, b, w) for n, b, w in model_configs if n in only_models]
 
     scaling_results = {name: {} for name, _, _ in model_configs}
 
@@ -765,4 +770,5 @@ if __name__ == "__main__":
             micro_batch=args.micro_batch,
             lr=args.lr,
             seed=args.seed,
+            only_models=only_models,
         )

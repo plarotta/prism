@@ -33,6 +33,8 @@ class MemoryWrite(nn.Module):
 
     Each slot queries the full token sequence and accumulates a weighted summary.
     A gated residual update lets memory retain old content across multiple writes.
+    No LayerNorm -- avoids normalizing shared memory to unit variance,
+    which would cause embedding collapse (see Issue 1/2 in HYBRID_V2_LOG.md).
 
     Complexity: O(n * k * d) -- linear in n for fixed k.
     """
@@ -53,7 +55,6 @@ class MemoryWrite(nn.Module):
         # Bias = +2.0 so sigmoid(2)=0.88: memory defaults to retaining old content
         nn.init.constant_(self.gate_proj.bias, 2.0)
 
-        self.norm = nn.LayerNorm(d)
         self.dropout = nn.Dropout(dropout)
 
     def forward(
@@ -94,7 +95,7 @@ class MemoryWrite(nn.Module):
         gate = torch.sigmoid(self.gate_proj(torch.cat([memory, retrieved], dim=-1)))
         updated = gate * memory + (1.0 - gate) * retrieved
 
-        return self.norm(updated)
+        return updated
 
 
 class MemoryRead(nn.Module):
