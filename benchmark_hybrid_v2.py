@@ -320,6 +320,8 @@ def train_niah(
         ], weight_decay=0.01)
         print(f"  Backbone LR={lr:.0e}, Memory LR={mem_lr:.0e} (ratio={memory_lr_ratio})")
     else:
+        backbone_params = None
+        mem_params = None
         optimizer = torch.optim.AdamW(model_wrapper.parameters(), lr=lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=n_steps, eta_min=1e-5
@@ -356,7 +358,13 @@ def train_niah(
         loss = result["loss"]
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(model_wrapper.parameters(), 1.0)
+        # Clip backbone and memory grad norms independently so memory
+        # params don't inflate the global norm and reduce backbone step size.
+        if has_memory:
+            torch.nn.utils.clip_grad_norm_(backbone_params, 1.0)
+            torch.nn.utils.clip_grad_norm_(mem_params, 1.0)
+        else:
+            torch.nn.utils.clip_grad_norm_(model_wrapper.parameters(), 1.0)
         optimizer.step()
         scheduler.step()
 

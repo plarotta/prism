@@ -81,6 +81,16 @@ Init-copying fix resolved warmup-phase divergence (steps 0–500 tracked AllSlow
 
 Improved over previous broken run (2.623→2.318) but memory modules still cause significant optimization drag. See Issue 3 for ongoing diagnosis.
 
+**HybridPRISM-12L (+ lower memory LR 0.1x, 2026-03-23):**
+
+| Model | Params | Final Loss | MRR | R@1 | R@5 | Time |
+|---|---|---|---|---|---|---|
+| HybridPRISM-12L | 28.4M | 1.863 | 0.011 | 0.000 | 0.014 | 5181s |
+
+Lower memory LR (3e-5 vs backbone 3e-4) dramatically improved training. Steps 0–500 tracked AllSlow-12L exactly (identical loss to 4 decimal places). Steps 500–900 gap was near zero (~0.01). Gap slowly grew to ~0.26 by step 3000. Final loss 1.863 vs AllSlow-12L 1.604. Retrieval still at random level.
+
+Next: separate gradient clipping (backbone vs memory clipped independently) to eliminate the remaining 0.26 gap.
+
 **Transformer-8L: PENDING**
 
 ---
@@ -161,6 +171,8 @@ Without LayerNorm, memory stays at std≈0.02 — small enough that early Memory
 
 Init divergence was a real problem (now fixed). But memory modules cause additional optimization drag once active. Leading suspects: (1) gradient clipping dilution — memory params inflate global grad norm, reducing backbone effective LR, (2) ReZero ramp-up interference — memory contribution growing from zero adds noise during critical learning phase.
 
-**Next fix (2026-03-22):** Lower memory LR. Use separate optimizer param groups: backbone at full LR (3e-4), memory params at reduced LR. Hypothesis: memory gradients are large relative to their useful signal early in training (ReZero means memory output is ~zero but gradients flow through the full cross-attention). A lower LR lets memory ramp up more gently without disrupting the backbone's learning.
+**Fix attempt: Lower memory LR (2026-03-23).** Separate optimizer param groups: backbone at 3e-4, memory at 3e-5 (0.1x ratio). Result: final loss 1.863 vs AllSlow 1.604 (gap 0.26). Major improvement over init-only fix (2.318, gap 0.71). Gap was ~zero at step 500–900, then slowly grew — consistent with gradient clipping dilution growing as memory gradients grow.
 
-**Status: PARTIALLY RESOLVED — init fixed, but memory optimization drag remains (~2.5x slower than AllSlow-12L). Trying lower memory LR next.**
+**Next fix (2026-03-23):** Separate gradient clipping. Clip backbone and memory grad norms independently so memory params don't inflate the global norm and reduce backbone's effective step size. Combined with lower memory LR.
+
+**Status: PARTIALLY RESOLVED — gap reduced from 1.02 → 0.71 → 0.26 across three fix rounds. Trying separate grad clipping next.**
