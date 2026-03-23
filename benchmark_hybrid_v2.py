@@ -230,12 +230,37 @@ def build_allslow_prism(vocab_size=REAL_VOCAB_SIZE, max_len=8192, n_layers=6, **
     return model
 
 
-def build_hybrid(vocab_size=REAL_VOCAB_SIZE, max_len=8192, config="medium", **kwargs):
-    """HybridPRISM with memory bank."""
+def build_hybrid(vocab_size=REAL_VOCAB_SIZE, max_len=8192, config="medium",
+                  match_allslow_init=True, **kwargs):
+    """HybridPRISM with memory bank.
+
+    If match_allslow_init=True, copies token_emb, pos_emb, and pooling weights
+    from an AllSlow-12L built with the same seed.  This ensures the PRISM backbone
+    starts from the identical init (the PRISM layers already match; only the
+    embedding/pooling diverge because memory module creation shifts the RNG).
+    """
+    # Save RNG state so we can build a reference AllSlow from the same seed
+    if match_allslow_init:
+        rng_state = torch.random.get_rng_state()
+        py_rng_state = random.getstate()
+
     if config == "small":
-        return hybrid_prism_small(vocab_size=vocab_size, max_len=max_len, **kwargs)
+        encoder = hybrid_prism_small(vocab_size=vocab_size, max_len=max_len, **kwargs)
     else:
-        return hybrid_prism_medium(vocab_size=vocab_size, max_len=max_len, **kwargs)
+        encoder = hybrid_prism_medium(vocab_size=vocab_size, max_len=max_len, **kwargs)
+
+    if match_allslow_init:
+        # Rebuild from the same seed to get matching embeddings/pooling
+        torch.random.set_rng_state(rng_state)
+        random.setstate(py_rng_state)
+        n_layers = 12 if config == "medium" else 6
+        ref = build_allslow_prism(vocab_size=vocab_size, max_len=max_len, n_layers=n_layers)
+        encoder.token_emb.load_state_dict(ref.token_emb.state_dict())
+        encoder.pos_emb.load_state_dict(ref.pos_emb.state_dict())
+        encoder.pooling.load_state_dict(ref.pooling.state_dict())
+        del ref
+
+    return encoder
 
 
 def build_transformer(vocab_size=REAL_VOCAB_SIZE, max_len=8192, **kwargs):
@@ -256,6 +281,7 @@ def train_niah(
     max_len,
     micro_batch=16,
     lr=3e-4,
+    memory_lr_ratio=0.1,
     log_interval=100,
     eval_fn=None,
     eval_interval=1000,
@@ -269,6 +295,7 @@ def train_niah(
         eval_fn: optional callable() -> dict for periodic evaluation
         eval_interval: evaluate every N steps
         memory_warmup_steps: freeze memory modules for first N steps (HybridPRISM only)
+        memory_lr_ratio: memory LR as fraction of backbone LR (default 0.1)
     """
     # Detect HybridPRISM and freeze memory during warmup
     from hybrid_prism import HybridPRISMEncoder
@@ -279,11 +306,21 @@ def train_niah(
         encoder.set_memory_enabled(False)
         print(f"  Memory disabled for first {memory_warmup_steps} steps")
 
-    # Only optimize params that currently require grad
-    optimizer = torch.optim.AdamW(
-        [p for p in model_wrapper.parameters() if p.requires_grad],
-        lr=lr, weight_decay=0.01,
-    )
+    # Split param groups: backbone at full LR, memory at reduced LR.
+    # Lower memory LR prevents memory modules from disrupting backbone learning
+    # during the ReZero ramp-up phase.
+    if has_memory:
+        mem_param_ids = {id(p) for p in encoder.memory_params()}
+        backbone_params = [p for p in model_wrapper.parameters() if id(p) not in mem_param_ids]
+        mem_params = [p for p in model_wrapper.parameters() if id(p) in mem_param_ids]
+        mem_lr = lr * memory_lr_ratio
+        optimizer = torch.optim.AdamW([
+            {"params": backbone_params, "lr": lr},
+            {"params": mem_params, "lr": mem_lr},
+        ], weight_decay=0.01)
+        print(f"  Backbone LR={lr:.0e}, Memory LR={mem_lr:.0e} (ratio={memory_lr_ratio})")
+    else:
+        optimizer = torch.optim.AdamW(model_wrapper.parameters(), lr=lr, weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=n_steps, eta_min=1e-5
     )
@@ -301,12 +338,6 @@ def train_niah(
         # Unfreeze memory after warmup
         if has_memory and memory_warmup_steps > 0 and step == memory_warmup_steps:
             encoder.set_memory_enabled(True)
-            # Add memory params to optimizer now that they require grad
-            optimizer.add_param_group({
-                "params": list(encoder.memory_params()),
-                "lr": lr,
-                "weight_decay": 0.01,
-            })
             print(f"  [{model_name}] Memory enabled at step {step}")
 
         optimizer.zero_grad()
@@ -435,6 +466,7 @@ def run_experiment_niah(
     seed=42,
     only_models=None,
     memory_warmup_steps=500,
+    memory_lr_ratio=0.1,
 ):
     """Run NIAH experiment at a single sequence length.
 
@@ -503,6 +535,7 @@ def run_experiment_niah(
                 micro_batch=micro_batch, lr=lr,
                 eval_fn=eval_fn, eval_interval=1000,
                 memory_warmup_steps=memory_warmup_steps,
+                memory_lr_ratio=memory_lr_ratio,
             )
 
             # Final evaluation
@@ -780,6 +813,8 @@ if __name__ == "__main__":
                         help="Comma-separated model names to run (default: all)")
     parser.add_argument("--memory-warmup", type=int, default=500,
                         help="Steps to freeze memory modules (HybridPRISM only, default: 500)")
+    parser.add_argument("--memory-lr-ratio", type=float, default=0.1,
+                        help="Memory LR as fraction of backbone LR (default: 0.1)")
     args = parser.parse_args()
 
     only_models = args.models.split(",") if args.models else None
@@ -793,6 +828,7 @@ if __name__ == "__main__":
             seed=args.seed,
             only_models=only_models,
             memory_warmup_steps=args.memory_warmup,
+            memory_lr_ratio=args.memory_lr_ratio,
         )
 
     if args.experiment in ("scaling", "all"):

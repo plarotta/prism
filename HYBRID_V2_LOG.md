@@ -34,7 +34,7 @@ Implemented `hybrid_prism.py` with: MemoryWrite, MemoryRead, HybridPRISMEncoder,
 
 ## Step 3: Needle-in-a-Haystack (Experiment 1)
 
-**Status:** GPU run in progress (rerunning HybridPRISM + Transformer after fix)
+**Status:** BLOCKED on Issue 3 — init fix validated but memory optimization drag remains (~2.5x slower)
 
 ### Implementation (2026-03-20)
 
@@ -71,7 +71,17 @@ Both at random-level retrieval despite decreasing contrastive loss. Confirms mea
 **HybridPRISM-12L (first run — FAILED, see Issue 1):**
 Loss stuck at ln(16)=2.7726 from step ~200. Model collapse due to MemoryRead LayerNorm. Fixed by removing LayerNorm, rerunning.
 
-**HybridPRISM-12L (rerun) + Transformer-8L: PENDING**
+**HybridPRISM-12L (init-copying fix + optimizer fix, 2026-03-22):**
+
+| Model | Params | Final Loss | MRR | R@1 | R@5 | Time |
+|---|---|---|---|---|---|---|
+| HybridPRISM-12L | 28.4M | 2.318 | 0.015 | 0.000 | 0.014 | 5187s |
+
+Init-copying fix resolved warmup-phase divergence (steps 0–500 tracked AllSlow-12L perfectly). But once memory enabled at step 500, learning slowed ~2.5x vs AllSlow-12L. Final loss 2.318 vs AllSlow-12L's 1.604 — a 0.71 gap. Retrieval metrics at random level (same as AllSlow baselines — mean pooling dilutes needle signal regardless).
+
+Improved over previous broken run (2.623→2.318) but memory modules still cause significant optimization drag. See Issue 3 for ongoing diagnosis.
+
+**Transformer-8L: PENDING**
 
 ---
 
@@ -133,4 +143,24 @@ Without LayerNorm, memory stays at std≈0.02 — small enough that early Memory
 
 **Actual root cause:** `HybridPRISMEncoder._init_weights` only initialized embeddings. `PRISMEncoder._init_weights` also zeros all `nn.Linear` biases (except recurrence gates). This means every projection, MLP, and fusion layer in HybridPRISM started with random biases (PyTorch Kaiming default) instead of zeros — a completely different optimization starting point from AllSlow-12L.
 
-**Fix:** Added bias zeroing to `HybridPRISMEncoder._init_weights`, matching `PRISMEncoder`. Excludes recurrence gates and MemoryWrite gate_proj (preserves bias=+2.0). Also kept memory warmup infrastructure (may still be useful later).
+**Fix attempt 1:** Added bias zeroing to `HybridPRISMEncoder._init_weights`. No effect.
+**Fix attempt 2:** Memory bypass (`set_memory_enabled(False)`) — completely skips memory ops during warmup (no dropout, no computation, no RNG perturbation). No effect.
+**Fix attempt 3:** Fixed-seed embedding init (0xBEEF). No effect (reverted).
+**Fix attempt 4:** Higher LR (1e-3). Made it WORSE — hard collapse.
+
+**Diagnosis (2026-03-21):** Confirmed via parameter comparison that all 12 PRISM layers are IDENTICAL between AllSlow-12L and HybridPRISM-12L (same seed). BUT token_emb, pos_emb, and MeanPooling.proj weights DIFFER because creating memory modules between the PRISM layers and `_init_weights` shifts the torch RNG. These are the input/output transformations of the model — different random init = different optimization starting point.
+
+**Current fix:** `build_hybrid()` now copies token_emb, pos_emb, and pooling weights from a reference AllSlow-12L model built with the same seed. This ensures the entire PRISM backbone (layers + embeddings + pooling) starts from identical weights.
+
+**Bug fix (2026-03-22):** Removed `optimizer.add_param_group()` call at memory warmup boundary. All params are now in the optimizer from initialization (AdamW skips frozen params with grad=None). The old code added memory params a second time, creating duplicates. `set_memory_enabled(True)` just flips `requires_grad` back on, which is sufficient.
+
+**GPU validation (2026-03-22):** Init-copying fix + optimizer bug fix confirmed:
+- Steps 0–500 (memory disabled): tracked AllSlow-12L within noise (2.7634 vs 2.7456 at step 400)
+- Steps 500–3000 (memory enabled): ~2.5x slower descent. Final loss 2.318 vs AllSlow-12L 1.604
+- Previous broken run final: 2.623 → this run: 2.318. Improvement but not resolved.
+
+Init divergence was a real problem (now fixed). But memory modules cause additional optimization drag once active. Leading suspects: (1) gradient clipping dilution — memory params inflate global grad norm, reducing backbone effective LR, (2) ReZero ramp-up interference — memory contribution growing from zero adds noise during critical learning phase.
+
+**Next fix (2026-03-22):** Lower memory LR. Use separate optimizer param groups: backbone at full LR (3e-4), memory params at reduced LR. Hypothesis: memory gradients are large relative to their useful signal early in training (ReZero means memory output is ~zero but gradients flow through the full cross-attention). A lower LR lets memory ramp up more gently without disrupting the backbone's learning.
+
+**Status: PARTIALLY RESOLVED — init fixed, but memory optimization drag remains (~2.5x slower than AllSlow-12L). Trying lower memory LR next.**

@@ -258,15 +258,8 @@ class HybridPRISMEncoder(nn.Module):
                     layer.interference_bwd = NoInterference(layer.d_c, layer.n_channels)
 
     def _init_weights(self):
-        # Save and restore RNG state so embedding init is independent of
-        # how many modules were created before this point.  This ensures
-        # the PRISM backbone starts from the same initialisation as a
-        # plain PRISMEncoder with the same seed.
-        rng_state = torch.random.get_rng_state()
-        torch.manual_seed(0xBEEF)  # fixed seed for embeddings
         nn.init.normal_(self.token_emb.weight, std=0.02)
         nn.init.normal_(self.pos_emb.weight, std=0.02)
-        torch.random.set_rng_state(rng_state)
         # Zero all Linear biases except recurrence gates and memory write
         # gates (matches PRISMEncoder init; preserves gate_proj bias=+2.0)
         skip = set()
