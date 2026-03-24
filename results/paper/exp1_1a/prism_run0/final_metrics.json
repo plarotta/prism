@@ -1,0 +1,8 @@
+{
+  "best_step": 50,
+  "best_metric": 0,
+  "final_loss": 0.95636,
+  "total_train_time_s": 23.0,
+  "total_params": 18455808,
+  "n_steps_completed": 100
+}

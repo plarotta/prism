@@ -79,3 +79,46 @@ Training AllSlow-PRISM-6L (3000 steps, max_len=2048, micro_batch=16, lr=3e-04, 5
   [AllSlow-PRISM-12L] Training complete in 5060.2s
 
   AllSlow-PRISM-12L FINAL: MRR=0.0135  R@1=0.0000  R@5=0.0100  loss=1.6041  time=5060s
+
+  --- HybridPRISM-12L ---
+  Parameters: 28,351,872 (28.4M)
+  Memory disabled for first 500 steps
+
+Training HybridPRISM-12L (3000 steps, max_len=2048, micro_batch=16, lr=3e-04, 5000 pairs)...
+   [HybridPRISM-12L] Step 100/3000  loss=2.7845  (166.4s)
+   [HybridPRISM-12L] Step 200/3000  loss=2.7705  (332.4s)
+  [HybridPRISM-12L] Step 300/3000  loss=2.7701  (498.5s)
+  [HybridPRISM-12L] Step 400/3000  loss=2.7634  (664.2s)
+  [HybridPRISM-12L] Step 500/3000  loss=2.7706  (830.2s)
+  [HybridPRISM-12L] Memory enabled at step 500
+  [HybridPRISM-12L] Step 600/3000  loss=2.7285  (1001.9s)
+  [HybridPRISM-12L] Step 700/3000  loss=2.7207  (1173.7s)
+  [HybridPRISM-12L] Step 800/3000  loss=2.7023  (1345.0s)
+  [HybridPRISM-12L] Step 900/3000  loss=2.6757  (1517.1s)
+  [HybridPRISM-12L] Step 1000/3000  loss=2.6784  (1688.4s)
+  [HybridPRISM-12L] Eval @1000: MRR=0.0139 R@1=0.0020
+  [HybridPRISM-12L] Step 1100/3000  loss=2.6462  (1881.4s)
+  [HybridPRISM-12L] Step 1200/3000  loss=2.6372  (2053.2s)
+  [HybridPRISM-12L] Step 1300/3000  loss=2.6191  (2225.1s)
+  [HybridPRISM-12L] Step 1400/3000  loss=2.5901  (2396.9s)
+  [HybridPRISM-12L] Step 1500/3000  loss=2.5895  (2569.1s)
+  [HybridPRISM-12L] Step 1600/3000  loss=2.5712  (2741.3s)
+  [HybridPRISM-12L] Step 1700/3000  loss=2.5406  (2912.9s)
+  [HybridPRISM-12L] Step 1800/3000  loss=2.5265  (3084.9s)
+  [HybridPRISM-12L] Step 1900/3000  loss=2.4812  (3256.3s)
+  [HybridPRISM-12L] Step 2000/3000  loss=2.4767  (3428.0s)
+  [HybridPRISM-12L] Eval @2000: MRR=0.0122 R@1=0.0000
+  [HybridPRISM-12L] Step 2100/3000  loss=2.4653  (3620.8s)
+  [HybridPRISM-12L] Step 2200/3000  loss=2.4329  (3792.3s)
+  [HybridPRISM-12L] Step 2300/3000  loss=2.4097  (3964.2s)
+  [HybridPRISM-12L] Step 2400/3000  loss=2.4145  (4136.5s)
+  [HybridPRISM-12L] Step 2500/3000  loss=2.3732  (4308.3s)
+  [HybridPRISM-12L] Step 2600/3000  loss=2.4042  (4479.6s)
+  [HybridPRISM-12L] Step 2700/3000  loss=2.3614  (4650.8s)
+  [HybridPRISM-12L] Step 2800/3000  loss=2.3366  (4822.0s)
+  [HybridPRISM-12L] Step 2900/3000  loss=2.3503  (4993.3s)
+  [HybridPRISM-12L] Step 3000/3000  loss=2.3181  (5165.0s)
+  [HybridPRISM-12L] Eval @3000: MRR=0.0145 R@1=0.0000
+  [HybridPRISM-12L] Training complete in 5186.5s
+
+  HybridPRISM-12L FINAL: MRR=0.0145  R@1=0.0000  R@5=0.0140  loss=2.3181  time=5187s

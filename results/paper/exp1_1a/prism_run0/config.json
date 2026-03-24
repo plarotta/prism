@@ -1,0 +1,30 @@
+{
+  "experiment": "exp1_1a",
+  "sub_experiment": "1a",
+  "model_key": "prism",
+  "model_name": "PRISM-Simplified",
+  "model_config": {
+    "max_len": 128,
+    "vocab_size": 30522,
+    "total_params": 18455808
+  },
+  "train_max_len": 128,
+  "eval_max_len": 128,
+  "training": {
+    "n_steps": 100,
+    "micro_batch": 4,
+    "grad_accum": 1,
+    "effective_batch": 4,
+    "lr": 0.0003,
+    "warmup_fraction": 0.1,
+    "weight_decay": 0.01,
+    "grad_clip": 1.0,
+    "seed": 42
+  },
+  "hardware": {
+    "torch_version": "2.10.0",
+    "cuda_available": false
+  },
+  "git_hash": "08e12c27950bd67a82d7e28a764b9f95291d6783",
+  "timestamp": "2026-03-23T22:31:08"
+}
