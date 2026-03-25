@@ -44,7 +44,7 @@ def capture_hardware_info() -> dict:
         info["gpu_count"] = torch.cuda.device_count()
         info["cuda_version"] = torch.version.cuda or "unknown"
         info["gpu_memory_gb"] = round(
-            torch.cuda.get_device_properties(0).total_mem / (1024**3), 1
+            torch.cuda.get_device_properties(0).total_memory / (1024**3), 1
         )
     return info
 
