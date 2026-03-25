@@ -48,8 +48,13 @@ def _select_device() -> str:
     return "cpu"
 
 
-def _check_loss_plateau(all_losses, window: int = 2000, min_relative_improvement: float = 0.01) -> bool:
+def _check_loss_plateau(all_losses, window: int = 2000, min_relative_improvement: float = 0.05,
+                        min_absolute_improvement: float = 0.005) -> bool:
     """Check if loss has plateaued by comparing recent window to previous window.
+
+    Triggers if BOTH:
+      - relative improvement < min_relative_improvement
+      - absolute improvement < min_absolute_improvement
 
     Returns True if loss has plateaued (should stop).
     """
@@ -59,8 +64,9 @@ def _check_loss_plateau(all_losses, window: int = 2000, min_relative_improvement
     previous = np.mean(all_losses[-2 * window:-window])
     if previous <= 0:
         return False
-    relative_improvement = (previous - recent) / previous
-    return relative_improvement < min_relative_improvement
+    abs_improvement = previous - recent
+    rel_improvement = abs_improvement / previous
+    return rel_improvement < min_relative_improvement and abs_improvement < min_absolute_improvement
 
 
 def train(
@@ -82,8 +88,8 @@ def train(
     device: str | None = None,
     seed: int = 42,
     compile: bool = False,
-    early_stop_patience: int = 5000,
-    early_stop_min_improvement: float = 0.01,
+    early_stop_patience: int = 3000,
+    early_stop_min_improvement: float = 0.05,
 ):
     """Train a contrastive embedding model with structured logging.
 
