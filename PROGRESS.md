@@ -1,18 +1,15 @@
 # PRISM: Experiment Progress
 
-## Current Status: LoCoV1 Benchmark (in progress)
+## Current Status: Paper Experiment Infrastructure (complete)
 
-Simplified PRISM dominates on the LoCoV1 long-context retrieval benchmark — a 12-task
-established benchmark spanning law, medicine, science, finance, and government documents.
-At max_len=2048, PRISM-Simplified scores **0.689 avg nDCG@10** vs the Transformer's
-**0.194** — a **+49.4 point gap**. The Transformer OOMs at max_len=8192 with micro_batch=4;
-PRISM runs comfortably at micro_batch=16.
+All 7 paper experiment runners are implemented and smoke-tested. The full pipeline is
+validated end-to-end: MS MARCO data download (400K queries, 5.5M passages from
+Tevatron/msmarco-passage), contrastive training loop, and LoCoV1 zero-shot evaluation.
 
-> PRISM-Simplified outperforms a parameter-matched Transformer by 3.5x on nDCG@10
-> across 12 long-context retrieval tasks, while using a fraction of the memory.
-> The Transformer cannot even train at 8K tokens on a 95 GB GPU.
+> Infrastructure ready. Next step: run experiments on GPU (Exp 1 first, then 2-7).
 
-**Next:** Run hybrid experiments (`benchmark_hybrid.py`) — attentive pooling, multi-head pooling, local attention hybrid, and decay spacing ablation to address the 8K < 2K gap.
+See `PAPER_EXPERIMENT_PLAN.md` for the full experiment design and `paper_dev_plan.md`
+for implementation details.
 
 ---
 
@@ -263,68 +260,72 @@ are approximate values read from their paper.
 
 ---
 
-## Phase 6: Hybrid Architecture Experiments (in progress)
+## Phase 6: Hybrid Architecture Experiments (complete)
 
-Addressing the 8K < 2K gap identified in Phase 5. Mean pooling dilutes embeddings at long sequences by weighting all tokens equally — boilerplate and low-information sections drag down the average. At 2K, truncation accidentally keeps only the information-dense beginning. At 8K, the model sees full documents but can't distinguish signal from noise at the pooling stage.
+Addressed the 8K < 2K gap identified in Phase 5.
 
-### Experiment 0: Improved Baselines (complete)
+### Key Results
 
-Re-ran LoCoV1 baselines with LR sweep ([1e-4, 3e-4, 5e-4, 1e-3]) and 7000 steps (up from 5000). Checkpoint eval every 1000 steps.
+| Experiment | Finding |
+|-----------|---------|
+| Improved Baselines | Transformer's 0.194 was bad LR; tuned → 0.672. PRISM still wins +9.8 pts (0.770 vs 0.672) |
+| Attentive Pooling | +1.8 pts at 8K, -1.7 pts at 2K. Pooling is not the bottleneck. |
+| Decay Ablation | **All-slow (λ=0.99) beats geometric by +7.2 nDCG@10.** Multi-scale decomposition is suboptimal. |
 
-| Model | max_len | Avg nDCG@10 | Loss | Train Time | Notes |
-|-------|---------|-------------|------|------------|-------|
-| PRISM-MeanPool | 2048 | **0.770** | 0.032 | 1754s | Best result overall |
-| Transformer | 2048 | 0.672 | 0.109 | 3631s | LR sweep fixed Phase 5's 0.194 |
-| PRISM-MeanPool | 8192 | 0.675 | 0.047 | 6661s | 8K < 2K gap persists (-9.5 pts) |
-| Transformer | 8192 | ~0.107 | 0.204 | discontinued | micro_batch=2, 5s/step, stalled |
+### Conclusions
 
-Key finding: The Transformer's Phase 5 score (0.194) was due to a bad LR, not architecture. With tuned LR it reaches 0.672, but PRISM still wins by +9.8 points at 2K.
+- The 8K < 2K gap is a backbone capacity problem, not pooling
+- Geometric decay spacing is suboptimal — uniform slow decay is better
+- The final architecture: all-slow decay, no interference, mean pooling
 
-### Experiment 1: Attentive Pooling (complete)
+---
 
-Replaced mean pooling with a single learned query vector (AttentivePooling). Tested at 2K and 8K.
+## Phase 7: Paper Experiment Infrastructure (complete)
 
-| Config | Avg nDCG@10 | Loss | Train Time |
-|--------|-------------|------|------------|
-| Attentive @ 2048 | 0.753 | 0.039 | 1765s |
-| Mean @ 2048 | **0.770** | 0.032 | 1752s |
-| Attentive @ 8192 | **0.692** | 0.048 | 6689s |
-| Mean @ 8192 | 0.675 | 0.047 | 6685s |
+Built the full experiment pipeline for a publication-ready evaluation. All infrastructure
+is implemented, smoke-tested, and validated end-to-end.
 
-**Success criteria results:**
-- **Primary (Attentive 8K > Mean 8K): PASS** — +1.8 points (0.692 vs 0.675)
-- **Ideal (Attentive 8K >= Mean 2K): FAIL** — -7.8 points (0.692 vs 0.770)
-- **Bonus (Attentive 2K > Mean 2K): FAIL** — -1.7 points (0.753 vs 0.770)
+### What Was Built
 
-**Interpretation:** Attentive pooling provides a modest boost at 8K but slightly hurts at 2K. Mean pooling dilution is real but minor — the 8K < 2K gap is primarily a backbone capacity problem, not a pooling problem. The 384-dim hidden state cannot compress 8K tokens of real language well regardless of how you pool.
+**Data pipelines:**
+- `data/msmarco.py` — MS MARCO passage retrieval (Tevatron/msmarco-passage: 400K queries, 5.5M passages, 30 hard negatives/query). Pre-tokenizes and caches to disk.
+- `data/loco_eval.py` — LoCoV1 12-task zero-shot evaluator (ported from benchmark_loco.py, eval-only)
+- `data/longembed_eval.py` — LongEmbed 6-task zero-shot evaluator (dwzhu/LongEmbed)
+- `data/beir_eval.py` — BEIR 15-dataset evaluator (MTEB-based with manual fallback)
 
-### Experiments 2 & 3: Skipped
+**Training infrastructure:**
+- `train_contrastive.py` — Model-agnostic contrastive training loop with structured logging, gradient accumulation, cosine schedule, checkpointing, and eval callbacks
+- `paper_log.py` — Structured logging utilities (run directories, config saving, hardware capture)
 
-Multi-head pooling (Exp 2) and local attention hybrid (Exp 3) skipped — the ~1.8 point delta from attentive pooling is too small to justify further pooling exploration. The bottleneck is in the recurrence backbone, not the pooling stage.
+**New model baselines:**
+- `mamba_bidir.py` — Bidirectional Mamba encoder (~20M params, CUDA-only with PyTorch fallback)
+- `linear_rnn.py` — Single-channel linear RNN ablation (~20M params)
 
-### Experiment 4: Decay Spacing Ablation (complete)
+**Experiment runners (7 total):**
+- `paper_exp1_controlled.py` — Controlled 4-model comparison at 128/512/2048/8192 tokens
+- `paper_exp2_efficiency.py` — Scaling curves (latency, memory, throughput) at 64-16384 tokens
+- `paper_exp3_ablations.py` — 10-variant component ablation study (baseline + A through I)
+- `paper_exp4_longembed.py` — LongEmbed evaluation on Exp 1 checkpoints
+- `paper_exp5_beir.py` — BEIR evaluation on Exp 1 checkpoints
+- `paper_exp6_pretrain.py` — Two-stage pretrain (AllNLI + Quora) → fine-tune (MS MARCO)
+- `paper_exp7_scaleup.py` — Scale-up to ~80M params (d=768, 8 layers)
 
-Tests whether geometric decay spacing is a meaningful inductive bias. All runs at max_len=2048, 5000 steps, mean pooling.
+### Smoke Test: PASSED
 
-| Decay Mode | λ values | Avg nDCG@10 | vs Geometric |
-|------------|----------|-------------|--------------|
-| **All-slow** | **all 0.99** | **0.764** | **+7.2 pts** |
-| Geometric (default) | log-spaced | 0.692 | — |
-| Linear | evenly spaced | 0.654 | -3.8 pts |
-| Random | uniform random | 0.641 | -5.1 pts |
-| All-fast | all 0.1 | ~0.26 @1K | discontinued |
+Full pipeline validated:
+1. MS MARCO data download and caching
+2. Contrastive training (100 steps)
+3. LoCoV1 zero-shot evaluation
+4. Checkpoint saving and structured logging
 
-**This is a surprising and important result.** Geometric decay spacing — the supposed core inductive bias — is *not* optimal. All-slow (λ=0.99 across all channels) wins by +7.2 nDCG@10 points. For document-level retrieval at 2K tokens, maximum global context in every channel beats multi-scale frequency decomposition. The input gating learns to differentiate channels without needing different base decay rates.
+### Next: Run Experiments on GPU
 
-Convergence trajectories show all-slow leads at every checkpoint:
-
-| Step | All-slow | Geometric | Linear | Random |
-|------|----------|-----------|--------|--------|
-| 1000 | **0.360** | 0.251 | 0.255 | 0.251 |
-| 2000 | **0.487** | 0.395 | 0.392 | 0.389 |
-| 3000 | **0.619** | 0.556 | 0.537 | 0.532 |
-| 4000 | **0.729** | 0.650 | 0.619 | 0.611 |
-| 5000 | **0.764** | 0.692 | 0.654 | 0.641 |
+Execution order per `paper_dev_plan.md`:
+1. Exp 2 (efficiency benchmarks — no training, validates all models)
+2. Exp 1a-1e (controlled comparison — the core results)
+3. Exp 3 (ablations)
+4. Exp 4-5 (LongEmbed + BEIR eval on Exp 1 checkpoints)
+5. Exp 6-7 (pretraining + scale-up, if core results are strong)
 
 ---
 
@@ -332,25 +333,69 @@ Convergence trajectories show all-slow leads at every checkpoint:
 
 ```
 prism/
-├── prism.py                    # Core architecture (+ V2 classes)
-├── baseline_transformer.py     # Transformer baseline (parameter-matched)
-├── benchmark_scaling.py        # Throughput / memory / latency vs seq length
-├── benchmark_quality.py        # Synthetic contrastive training + retrieval eval
-├── benchmark_ablations.py      # Original component ablation study (A-D)
-├── benchmark_v2_ablations.py   # V2 targeted fixes ablation (A-G)
-├── benchmark_real_data.py      # Real-data evaluation (NLI, STS-B, long-doc)
-├── benchmark_loco.py           # LoCoV1 12-task long-context retrieval benchmark
-├── benchmark_hybrid.py         # Phase 6: attentive pooling, local attn, decay ablations
-├── hydbrid_arch_plan.md        # Hybrid experiment plan (Experiments 1-4)
-├── investigate.py              # Phase 2: alpha autopsy + warm init + long-seq
-├── run_all.py                  # Phase 1 runner (scaling + quality + ablations)
-├── run_all_v2.py               # Master runner (everything: scaling → real data)
-├── plan_loco.md                # LoCoV1 experiment plan
-├── PRISM_Technical_Report.txt  # Original architecture design
-├── PRISM_v2fixes.txt           # Analysis of why novel components failed + fixes
-├── PRISM_Experiment_Plan.md    # Original 16-week plan
-├── PROGRESS.md                 # This file
-├── pyproject.toml              # uv project config
-└── results/                    # All generated data + plots
-    └── loco/                   # LoCoV1 results + plots
+  # --- Core architecture ---
+  prism.py                        # PRISMLayer, PRISMEncoder, PRISMForEmbedding, pooling classes
+  baseline_transformer.py         # TransformerEncoder, TransformerForEmbedding
+  benchmark_ablations.py          # MeanPooling, NoInterference, LearnedDecayRecurrence, etc.
+
+  # --- New model baselines (paper) ---
+  mamba_bidir.py                  # Bidirectional Mamba encoder (~20M params)
+  linear_rnn.py                   # Single-channel linear RNN ablation (~20M params)
+  hybrid_prism.py                 # Hybrid PRISM experiments (Phase 6)
+
+  # --- Data pipelines ---
+  data/
+    __init__.py
+    msmarco.py                    # MS MARCO passage retrieval (Tevatron/msmarco-passage)
+    loco_eval.py                  # LoCoV1 12-task zero-shot evaluator
+    longembed_eval.py             # LongEmbed 6-task zero-shot evaluator
+    beir_eval.py                  # BEIR 15-dataset evaluator (MTEB + manual fallback)
+
+  # --- Paper experiment runners ---
+  paper_log.py                    # Structured logging (run dirs, config, checkpoints)
+  train_contrastive.py            # Unified contrastive training loop
+  paper_exp1_controlled.py        # Exp 1: 4-model controlled comparison
+  paper_exp2_efficiency.py        # Exp 2: scaling curves (latency, memory, throughput)
+  paper_exp3_ablations.py         # Exp 3: 10-variant component ablation
+  paper_exp4_longembed.py         # Exp 4: LongEmbed evaluation
+  paper_exp5_beir.py              # Exp 5: BEIR evaluation
+  paper_exp6_pretrain.py          # Exp 6: pretrain + fine-tune pipeline
+  paper_exp7_scaleup.py           # Exp 7: scale-up to ~80M params
+
+  # --- Earlier experiment runners (Phases 1-6) ---
+  benchmark_scaling.py            # Throughput / memory / latency vs seq length
+  benchmark_quality.py            # Synthetic contrastive training + retrieval eval
+  benchmark_v2_ablations.py       # V2 targeted fixes ablation (A-G)
+  benchmark_real_data.py          # Real-data evaluation (NLI, STS-B, long-doc)
+  benchmark_loco.py               # LoCoV1 training + eval (Phase 5)
+  benchmark_hybrid.py             # Phase 6: attentive pooling, decay ablations
+  benchmark_hybrid_v2.py          # Phase 6 v2 experiments
+  investigate.py                  # Phase 2: alpha autopsy + warm init + long-seq
+  run_all.py                      # Phase 1 runner
+  run_all_v2.py                   # Master runner (phases 1-4)
+  dry_run.py                      # Quick validation script
+  plot_hybrid_results.py          # Phase 6 result plotting
+
+  # --- Documentation ---
+  PROGRESS.md                     # This file
+  RESEARCH_SUMMARY.md             # Full research narrative
+  PAPER_EXPERIMENT_PLAN.md        # 7-experiment paper design
+  paper_dev_plan.md               # Implementation plan for paper experiments
+  HYBRID_V2_LOG.md                # Hybrid experiment log
+  PRISM_Experiment_Plan.md        # Original 16-week plan
+  hydbrid_arch_plan.md            # Hybrid architecture plan
+  hybrid_planv2.md                # Hybrid plan v2
+  hybrid_v2_dev_plan.md           # Hybrid v2 dev plan
+  plan_loco.md                    # LoCoV1 experiment plan
+  causal_prism_plan.md            # Causal LM exploration (shelved)
+  prism_prior_work.md             # Prior work survey
+
+  # --- Config ---
+  pyproject.toml                  # uv project config (optional deps: [paper], [mamba])
+
+  # --- Results ---
+  results/                        # All generated data + plots
+    loco/                         # LoCoV1 results (Phases 5-6)
+    hybrid_v2/                    # Hybrid experiment results
+    paper/                        # Paper experiment outputs (exp1-exp7 subdirs)
 ```

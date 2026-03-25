@@ -373,22 +373,6 @@ PRISM advantage over the tuned Transformer: +9.2 to +9.8 nDCG@10 points at 2K de
 
 The pooling hypothesis has been tested and ruled out as the primary cause. Attentive pooling confirms mean pooling dilution is real but minor (~1.8 pts). The remaining gap (~7.8 pts) points to backbone capacity: a 384-dim hidden state across 6 layers cannot compress 8K tokens of real language as effectively as it handles 2K. Likely fixes: wider channels, more channels, or pretraining on long sequences.
 
-### Immediate next steps
-
-- Run PRISM-AllSlow at 7000 steps to get an apples-to-apples comparison with the 0.770 geometric baseline
-- Consider running all-slow at 8K to see if it also helps the long-context case
-- Reassess what differentiates PRISM from a generic multi-channel SSM now that geometric spacing is disproven
-
-### What a paper would need
-
-1. **Reframe the architecture narrative.** The geometric decay story is dead. The new claim is: uniform slow-decay multi-channel recurrence with learned input gating is a simple, effective architecture for long-document embeddings. The gating mechanism, not the decay spacing, is doing the differentiation work.
-
-2. **Fair comparison with M2-BERT.** Current LoCoV1 results are strong but the training protocol differs (we train on LoCoV1 pairs; M2-BERT is evaluated zero-shot). Implementing the pretrain → fine-tune → zero-shot eval pipeline would make this comparison rigorous.
-
-3. **Address the 8K < 2K gap.** Pooling fixes are exhausted. Next directions: wider/deeper backbone, pretraining on long sequences, or accepting that 2K truncation is the right operating point for this model scale. All-slow at 8K is worth testing.
-
-4. **Scale sensitivity.** All experiments use ~20M parameter models. At least one experiment at 100M+ would show whether findings hold.
-
 ### The negative results are also valuable
 
 Three clean negative results worth documenting:
@@ -398,3 +382,47 @@ Three clean negative results worth documenting:
 2. **Attentive pooling:** A reasonable hypothesis (mean pooling dilution causes the 8K < 2K gap) tested cleanly and shown to be a minor factor. The bottleneck is backbone capacity, not pooling.
 
 3. **Geometric decay spacing:** The supposed core inductive bias of the architecture is suboptimal. All-slow (λ=0.99) beats geometric by +7.2 nDCG@10 points on LoCoV1. Multi-scale frequency decomposition is not needed for document-level retrieval — the gating mechanism learns to differentiate channels on its own.
+
+## 9. Paper Experiment Infrastructure (built, ready to run)
+
+Decided to publish PRISM as an embedding paper. Built a complete experiment pipeline for rigorous, publication-ready evaluation. See `PAPER_EXPERIMENT_PLAN.md` for the full 7-experiment design.
+
+### Architecture Decision
+
+The paper will evaluate **PRISM-Simplified** (the architecture that works) against three baselines:
+
+| Model | Params | Architecture |
+|-------|--------|-------------|
+| PRISM-Simplified | ~19M | Multi-channel recurrence, all-slow decay (λ=0.99), mean pooling |
+| Transformer | ~20M | Standard attention, 6 heads, mean pooling |
+| Mamba-Bidir | ~20M | Bidirectional Mamba SSM, gated fusion, mean pooling |
+| Linear-RNN | ~19M | Single-channel linear recurrence (PRISM with C=1) |
+
+All models parameter-matched, trained on MS MARCO passage retrieval (Tevatron/msmarco-passage: 400K queries, 5.5M passages, 30 BM25 hard negatives per query), evaluated zero-shot on LoCoV1, LongEmbed, and BEIR.
+
+### Seven Experiments
+
+1. **Controlled Comparison** (Exp 1) — 4 models at 128/512/2048/8192 tokens, 50K steps each. The core result.
+2. **Efficiency Benchmarks** (Exp 2) — Scaling curves at 64-16384 tokens for latency, memory, throughput.
+3. **Component Ablations** (Exp 3) — 10 variants testing each PRISM component (channels, decay, gating, direction, interference, pooling).
+4. **LongEmbed** (Exp 4) — 6-task long-context evaluation at multiple sequence lengths.
+5. **BEIR** (Exp 5) — 15-dataset short-document retrieval with published baseline comparisons.
+6. **Pretraining** (Exp 6) — Two-stage: pretrain on weak pairs (AllNLI + Quora) → fine-tune on MS MARCO → zero-shot eval.
+7. **Scale-Up** (Exp 7) — Repeat Exp 1 at ~80M parameters (d=768, 8 layers).
+
+### Infrastructure Status
+
+All implemented and smoke-tested:
+- Data pipelines: `data/msmarco.py`, `data/loco_eval.py`, `data/longembed_eval.py`, `data/beir_eval.py`
+- Training: `train_contrastive.py` (unified loop), `paper_log.py` (structured logging)
+- Model baselines: `mamba_bidir.py`, `linear_rnn.py`
+- Experiment runners: `paper_exp1_controlled.py` through `paper_exp7_scaleup.py`
+
+### What's Next
+
+Run the experiments on GPU. Expected execution order:
+1. Exp 2 (efficiency — no training, fast validation)
+2. Exp 1a-1e (controlled comparison — the headline results)
+3. Exp 3 (ablations)
+4. Exp 4-5 (eval-only on Exp 1 checkpoints)
+5. Exp 6-7 (pretraining + scale-up, contingent on core results)

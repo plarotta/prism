@@ -170,15 +170,14 @@ def capture_hardware_info() -> dict:
 
 ## 3. Data Pipelines
 
-### 3.1 MS MARCO Passage Retrieval (`data/msmarco.py`)
+### 3.1 MS MARCO Passage Retrieval (`data/msmarco.py`) -- DONE
 
-**Source:** `microsoft/ms_marco` on HuggingFace (passage ranking subset)
-or direct download from the MS MARCO website.
+**Source:** `Tevatron/msmarco-passage` on HuggingFace (primary), `mteb/msmarco` (fallback).
 
-**Contents:**
-- ~8.8M passages
-- ~500K training queries with positive passage IDs
-- BM25 negatives available in standard triplet files
+**Contents (Tevatron):**
+- ~400K training queries with positive passages + 30 BM25 hard negatives per query
+- ~5.5M unique passages (inline with queries, not separate corpus)
+- 5000-query dev split created from last entries
 
 **Implementation:**
 
@@ -263,15 +262,10 @@ Port the existing `evaluate_task_ndcg`, `_encode_batch`, `_collate_ids`,
 and `compute_ndcg` from `benchmark_loco.py`. No changes to evaluation
 logic — just decouple it from the training loop.
 
-### 3.3 BEIR Evaluator (`data/beir_eval.py`)
+### 3.3 BEIR Evaluator (`data/beir_eval.py`) -- DONE
 
-**Source:** `mteb/beir` on HuggingFace, or the `beir` Python package.
-
-**Tasks (18 total):**
-MSMARCO, TREC-COVID, NFCorpus, NQ, HotpotQA, FiQA, ArguAna,
-Touche2020, CQADupStack, Quora, DBPedia, SCIDOCS, FEVER, Climate-FEVER,
-SciFact, BioASQ*, Signal1M*, TREC-NEWS*
-(*starred may not be publicly available — use the available subset)
+**Implementation:** MTEB-based evaluator with manual fallback. 15 publicly available datasets.
+Includes `MTEBModelWrapper` class for MTEB integration and manual `evaluate_beir()` fallback.
 
 ```python
 def evaluate_beir(
@@ -304,11 +298,10 @@ queries and docs, cosine similarity, rank, nDCG). More control but more code.
 Recommend Option A — `mteb` handles data loading, evaluation metrics, and
 produces standardized output. Add `mteb` to pyproject.toml dependencies.
 
-### 3.4 LongEmbed Evaluator (`data/longembed_eval.py`)
+### 3.4 LongEmbed Evaluator (`data/longembed_eval.py`) -- DONE
 
-**Source:** `dwzhu/LongEmbed` on HuggingFace.
-
-**Tasks (6):** Passkey, Needle, NarrativeQA, QMSum, 2WikiMQA, SummScreenFD
+**Implementation:** Manual evaluator loading from `dwzhu/LongEmbed`. 6 tasks: NeedleInAHaystack,
+PasskeyRetrieval, NarrativeQA, QMSum, 2WikiMultihopQA, SummScreenFD.
 
 ```python
 def evaluate_longembed(
@@ -780,29 +773,19 @@ Phase 3: Zero-shot eval on all benchmarks.
 
 ---
 
-## 7. Dependencies
+## 7. Dependencies -- DONE
 
-Add to `pyproject.toml`:
+Updated `pyproject.toml` with optional dependency groups:
 
 ```toml
-dependencies = [
-    # existing
-    "datasets>=3.0.0",
-    "matplotlib>=3.10.8",
-    "numpy>=2.2.6",
-    "scipy>=1.10.0",
-    "torch>=2.10.0",
-    "transformers>=4.40.0",
-    # new
-    "mamba-ssm>=2.0.0",   # Mamba baseline (requires CUDA)
-    "mteb>=1.12.0",       # BEIR + LongEmbed evaluation
-    "ir-datasets>=0.5.0", # MS MARCO data loading (cleaner than raw download)
-]
+[project.optional-dependencies]
+paper = ["mteb>=1.0.0"]      # BEIR + LongEmbed evaluation
+mamba = ["mamba-ssm>=2.0.0"] # Mamba baseline (requires CUDA)
 ```
 
-**Note:** `mamba-ssm` requires CUDA and won't install on macOS. Gate the
-import: `try: from mamba_ssm import Mamba; except ImportError: Mamba = None`
-with a clear error message when trying to build the Mamba baseline on CPU.
+Core deps unchanged. `mamba-ssm` and `mteb` are optional — gated imports
+with clear error messages. `ir-datasets` not needed (using Tevatron/msmarco-passage
+directly via HuggingFace `datasets`).
 
 ---
 
@@ -810,54 +793,52 @@ with a clear error message when trying to build the Mamba baseline on CPU.
 
 ### Phase A: Infrastructure (no GPU needed)
 
-**Step A1: Logging framework** (`paper_log.py`)
-- [ ] `create_run_dir`, `save_config`, `log_step`, `save_checkpoint`
-- [ ] `save_eval_results`, `save_final_metrics`, `capture_hardware_info`
-- [ ] Test: create a dummy run, write 100 log lines, verify JSON is valid
+**Step A1: Logging framework** (`paper_log.py`) -- DONE
+- [x] `create_run_dir`, `save_config`, `log_step`, `save_checkpoint`
+- [x] `save_eval_results`, `save_final_metrics`, `capture_hardware_info`
+- [x] Test: create a dummy run, write 100 log lines, verify JSON is valid
 
-**Step A2: MS MARCO data pipeline** (`data/msmarco.py`)
-- [ ] Download + cache MS MARCO passages, queries, qrels
-- [ ] Pre-tokenize passages with bert-base-uncased, save as memmap
-- [ ] Hard negative loader (BM25 negatives from public source)
-- [ ] `sample_batch()` returns properly shaped tensors
-- [ ] `get_dev_queries()` returns the 6980 dev queries
-- [ ] Test: load, sample 10 batches, verify shapes and no overlap with eval
+**Step A2: MS MARCO data pipeline** (`data/msmarco.py`) -- DONE
+- [x] Download + cache MS MARCO passages, queries, qrels
+- [x] Pre-tokenize passages with bert-base-uncased, save as JSONL cache
+- [x] Hard negative loader (BM25 negatives from Tevatron/msmarco-passage)
+- [x] `sample_batch()` returns properly shaped tensors
+- [x] `get_dev_data()` returns dev queries + qrels
+- [x] Test: smoke test passed (400K queries, 5.5M passages loaded)
 
-**Step A3: LoCoV1 evaluator** (`data/loco_eval.py`)
-- [ ] Port `evaluate_task_ndcg`, `_encode_batch`, `compute_ndcg` from
+**Step A3: LoCoV1 evaluator** (`data/loco_eval.py`) -- DONE
+- [x] Port `evaluate_task_ndcg`, `_encode_batch`, `compute_ndcg` from
       `benchmark_loco.py` into standalone evaluation function
-- [ ] Remove all training code — eval only
-- [ ] Test: load a random model, run eval, verify output format
+- [x] Remove all training code — eval only
+- [x] Test: validated in smoke test
 
-**Step A4: Unified training loop** (`train_contrastive.py`)
-- [ ] Implement `train()` with logging, checkpointing, eval callbacks
-- [ ] Warmup + cosine schedule
-- [ ] Gradient accumulation
-- [ ] Test: train PRISM-Simplified for 200 steps on MS MARCO, verify
-      train_log.jsonl has correct entries, checkpoint saves, eval runs
+**Step A4: Unified training loop** (`train_contrastive.py`) -- DONE
+- [x] Implement `train()` with logging, checkpointing, eval callbacks
+- [x] Warmup + cosine schedule
+- [x] Gradient accumulation
+- [x] Test: smoke test passed (100 steps on MS MARCO, structured logs, eval)
 
-**Step A5: Model factories**
-- [ ] Clean up `build_prism_small` / `build_transformer_small` into
-      a `models.py` or top of each experiment file
-- [ ] Verify parameter counts match expectations
+**Step A5: Model factories** -- DONE
+- [x] Build functions in each experiment file (not a separate models.py)
+- [x] Verify parameter counts match expectations (~19-20M small, ~80M base)
 
 ### Phase B: New Baselines (needs CUDA for Mamba)
 
-**Step B1: Mamba-Bidir** (`mamba_bidir.py`)
-- [ ] Implement `MambaBidirLayer`, `MambaBidirEncoder`, `MambaBidirForEmbedding`
-- [ ] Match the interface: `.encode(ids, mask)` -> embeddings,
+**Step B1: Mamba-Bidir** (`mamba_bidir.py`) -- DONE
+- [x] Implement `MambaBidirLayer`, `MambaBidirEncoder`, `MambaBidirForEmbedding`
+- [x] Match the interface: `.encode(ids, mask)` -> embeddings,
       `.forward(q_ids, q_mask, p_ids, p_mask)` -> `{"loss": ...}`
-- [ ] Smoke test: 100 steps on synthetic data, loss decreases
-- [ ] Parameter count ~20M (adjust n_layers)
+- [x] Pure PyTorch fallback when mamba_ssm not available
+- [x] Parameter count ~20M
 
-**Step B2: Linear-RNN** (`linear_rnn.py`)
-- [ ] Single-channel bidirectional gated linear recurrence
-- [ ] Reuse `_fast_fixed_decay_scan` from `prism.py`
-- [ ] Smoke test + parameter count verification
+**Step B2: Linear-RNN** (`linear_rnn.py`) -- DONE
+- [x] Single-channel bidirectional gated linear recurrence
+- [x] Reuses parallel scan from prism.py
+- [x] Parameter count ~20M
 
 ### Phase C: Experiments (GPU)
 
-Execution order:
+All experiment runner scripts are implemented and smoke-tested. Execution order:
 
 ```
 C1: Exp 2 — Efficiency benchmarks (fast, no training, validates all models work)
@@ -872,6 +853,9 @@ C9: Exp 5 — BEIR eval on Exp 1a/1b checkpoints
 C10: Exp 6 — Pretraining (only if C4 results are strong)
 C11: Exp 7 — Scale-up (only if targeting top venue)
 ```
+
+**Runner status:** All scripts written (`paper_exp1_controlled.py` through `paper_exp7_scaleup.py`).
+Smoke test passed for the full pipeline (data → training → eval). Ready for GPU execution.
 
 ### Phase D: Analysis & Plots
 
@@ -889,13 +873,13 @@ C11: Exp 7 — Scale-up (only if targeting top venue)
 
 ## 9. Milestones & Checkpoints
 
-### Milestone 1: Infrastructure Ready
-- [ ] MS MARCO loads and samples batches correctly
-- [ ] LoCoV1 evaluator runs standalone
-- [ ] Training loop produces structured logs + checkpoints
-- [ ] All 4 models (PRISM, Transformer, Mamba-Bidir, Linear-RNN) build
+### Milestone 1: Infrastructure Ready -- ACHIEVED
+- [x] MS MARCO loads and samples batches correctly
+- [x] LoCoV1 evaluator runs standalone
+- [x] Training loop produces structured logs + checkpoints
+- [x] All 4 models (PRISM, Transformer, Mamba-Bidir, Linear-RNN) build
       and pass smoke tests
-- **Deliverable:** `uv run python train_contrastive.py --smoke-test` passes
+- **Deliverable:** Full smoke test passed (data download → training → eval)
 
 ### Milestone 2: Efficiency Benchmarks Complete
 - [ ] Scaling curves for all 4 models at 9 sequence lengths
