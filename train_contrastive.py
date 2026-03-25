@@ -48,6 +48,21 @@ def _select_device() -> str:
     return "cpu"
 
 
+def _check_loss_plateau(all_losses, window: int = 2000, min_relative_improvement: float = 0.01) -> bool:
+    """Check if loss has plateaued by comparing recent window to previous window.
+
+    Returns True if loss has plateaued (should stop).
+    """
+    if len(all_losses) < 2 * window:
+        return False
+    recent = np.mean(all_losses[-window:])
+    previous = np.mean(all_losses[-2 * window:-window])
+    if previous <= 0:
+        return False
+    relative_improvement = (previous - recent) / previous
+    return relative_improvement < min_relative_improvement
+
+
 def train(
     model_wrapper,
     dataset,
@@ -67,6 +82,8 @@ def train(
     device: str | None = None,
     seed: int = 42,
     compile: bool = False,
+    early_stop_patience: int = 5000,
+    early_stop_min_improvement: float = 0.01,
 ):
     """Train a contrastive embedding model with structured logging.
 
@@ -88,6 +105,12 @@ def train(
         eval_fn: callable(model, step) -> dict, or None
         device: torch device string (auto-detected if None)
         seed: random seed
+        compile: use torch.compile (CUDA only)
+        early_stop_patience: stop if loss doesn't improve by
+            early_stop_min_improvement over this many steps.
+            Set to 0 to disable.
+        early_stop_min_improvement: minimum relative improvement
+            (fraction) over the patience window to continue training.
 
     Returns:
         dict with best_step, best_metric, train_losses
@@ -113,6 +136,8 @@ def train(
         "weight_decay": weight_decay,
         "grad_clip": grad_clip,
         "seed": seed,
+        "early_stop_patience": early_stop_patience,
+        "early_stop_min_improvement": early_stop_min_improvement,
     }
     save_config(run_dir, config)
 
@@ -143,6 +168,9 @@ def train(
           f"effective_batch={micro_batch * grad_accum})")
     print(f"  LR: {lr} with {warmup_steps} warmup steps, cosine decay")
     print(f"  Eval every {eval_every} steps, checkpoint every {checkpoint_every} steps")
+    if early_stop_patience > 0:
+        print(f"  Early stopping: patience={early_stop_patience}, "
+              f"min_improvement={early_stop_min_improvement:.1%}")
 
     # AMP setup (bf16 on CUDA, no scaler needed for bf16)
     use_amp = (device == "cuda" and torch.cuda.is_bf16_supported())
@@ -151,6 +179,7 @@ def train(
         print(f"  Using automatic mixed precision (bf16)")
 
     model_wrapper.train()
+    stopped_early = False
 
     for step in range(1, n_steps + 1):
         optimizer.zero_grad()
@@ -221,9 +250,31 @@ def train(
 
             model_wrapper.train()
 
+        # --- Early stopping (loss plateau) ---
+        if (early_stop_patience > 0
+                and step > warmup_steps + early_stop_patience
+                and step % log_every == 0):
+            if _check_loss_plateau(
+                all_losses,
+                window=early_stop_patience,
+                min_relative_improvement=early_stop_min_improvement,
+            ):
+                elapsed = time.perf_counter() - t0
+                recent = np.mean(all_losses[-early_stop_patience:])
+                previous = np.mean(all_losses[-2 * early_stop_patience:-early_stop_patience])
+                print(f"  [step {step}] Early stopping: loss plateaued "
+                      f"({previous:.5f} -> {recent:.5f}, "
+                      f"<{early_stop_min_improvement:.1%} improvement "
+                      f"over {early_stop_patience} steps)")
+                # Save final checkpoint before stopping
+                save_checkpoint(run_dir, model_wrapper, optimizer, step)
+                stopped_early = True
+                break
+
     # --- Final ---
     total_time = time.perf_counter() - t0
-    print(f"  Training complete in {total_time:.0f}s")
+    steps_completed = step if stopped_early else n_steps
+    print(f"  Training complete in {total_time:.0f}s ({steps_completed} steps)")
 
     final = {
         "best_step": best_step,
@@ -231,7 +282,8 @@ def train(
         "final_loss": round(float(np.mean(all_losses[-100:])), 5),
         "total_train_time_s": round(total_time, 1),
         "total_params": total_params,
-        "n_steps_completed": n_steps,
+        "n_steps_completed": steps_completed,
+        "stopped_early": stopped_early,
     }
     save_final_metrics(run_dir, final)
 
