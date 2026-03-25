@@ -66,6 +66,7 @@ def train(
     eval_fn=None,
     device: str | None = None,
     seed: int = 42,
+    compile: bool = False,
 ):
     """Train a contrastive embedding model with structured logging.
 
@@ -121,6 +122,10 @@ def train(
     trainable_params = sum(p.numel() for p in model_wrapper.parameters() if p.requires_grad)
     print(f"  Parameters: {total_params:,} total, {trainable_params:,} trainable")
 
+    if compile and device == "cuda":
+        print(f"  Compiling model with torch.compile...")
+        model_wrapper = torch.compile(model_wrapper)
+
     optimizer = torch.optim.AdamW(
         model_wrapper.parameters(), lr=lr, weight_decay=weight_decay,
     )
@@ -139,6 +144,12 @@ def train(
     print(f"  LR: {lr} with {warmup_steps} warmup steps, cosine decay")
     print(f"  Eval every {eval_every} steps, checkpoint every {checkpoint_every} steps")
 
+    # AMP setup (bf16 on CUDA, no scaler needed for bf16)
+    use_amp = (device == "cuda" and torch.cuda.is_bf16_supported())
+    amp_dtype = torch.bfloat16 if use_amp else torch.float32
+    if use_amp:
+        print(f"  Using automatic mixed precision (bf16)")
+
     model_wrapper.train()
 
     for step in range(1, n_steps + 1):
@@ -148,13 +159,14 @@ def train(
         for _ in range(grad_accum):
             batch = dataset.sample_batch(micro_batch)
             batch = {k: v.to(device) for k, v in batch.items()}
-            result = model_wrapper(
-                batch["query_ids"], batch["query_mask"],
-                batch["pos_ids"], batch["pos_mask"],
-            )
-            loss = result["loss"] / grad_accum
+            with torch.autocast(device, dtype=amp_dtype, enabled=use_amp):
+                result = model_wrapper(
+                    batch["query_ids"], batch["query_mask"],
+                    batch["pos_ids"], batch["pos_mask"],
+                )
+                loss = result["loss"] / grad_accum
             loss.backward()
-            step_loss += loss.item()
+            step_loss += loss.detach()
 
         grad_norm = torch.nn.utils.clip_grad_norm_(
             model_wrapper.parameters(), grad_clip,
@@ -162,7 +174,7 @@ def train(
         optimizer.step()
         scheduler.step()
 
-        all_losses.append(step_loss)
+        all_losses.append(float(step_loss))
 
         # --- Logging ---
         if step % log_every == 0:

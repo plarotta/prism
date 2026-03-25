@@ -215,15 +215,33 @@ class StratifiedRecurrence(nn.Module):
         Returns:
             list of C hidden-state sequences, each (B, T, d_c)
         """
-        hiddens = []
-        for c, (z_c, gate_c) in enumerate(zip(channels, gates)):
-            # Input gating: g_t = σ(W_g z_t)
-            g_t = torch.sigmoid(gate_c(z_c))  # (B, T, d_c)
-            gated_input = g_t * z_c            # (B, T, d_c)
+        # Extract all lambda values once (avoid per-channel GPU-CPU sync)
+        lam_values = self.lambdas.detach().tolist()
 
-            # Vectorized parallel scan with fixed scalar decay
-            lam = self.lambdas[c].item()
-            h_c = _fast_fixed_decay_scan(lam, gated_input)
+        # Apply per-channel gating
+        gated = []
+        for z_c, gate_c in zip(channels, gates):
+            g_t = torch.sigmoid(gate_c(z_c))  # (B, T, d_c)
+            gated.append(g_t * z_c)
+
+        # Fast path: batch all channels into one scan when all decays are equal
+        all_same = all(abs(lam_values[i] - lam_values[0]) < 1e-8
+                       for i in range(1, len(lam_values)))
+        if all_same and len(gated) > 1:
+            C = len(gated)
+            # Stack: (C, B, T, d_c) -> reshape to (C*B, T, d_c)
+            stacked = torch.stack(gated, dim=0)
+            CB, T, D = C * stacked.shape[1], stacked.shape[2], stacked.shape[3]
+            stacked = stacked.reshape(CB, T, D)
+            h_all = _fast_fixed_decay_scan(lam_values[0], stacked)
+            # Split back to list of C tensors
+            h_all = h_all.reshape(C, -1, T, D)
+            return [h_all[c] for c in range(C)]
+
+        # General path: per-channel scan with different decays
+        hiddens = []
+        for c, gated_input in enumerate(gated):
+            h_c = _fast_fixed_decay_scan(lam_values[c], gated_input)
             hiddens.append(h_c)
         return hiddens
 
