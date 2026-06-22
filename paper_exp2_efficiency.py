@@ -162,13 +162,40 @@ def measure_peak_memory(model, seq_len, batch_size, device):
 # Main benchmark loop
 # ---------------------------------------------------------------------------
 
+def _is_oom(e: Exception) -> bool:
+    """True for CUDA OOM, including the allocator-assert form some virtualized
+    GPUs raise instead of a clean 'out of memory' (CUDACachingAllocator assert)."""
+    s = str(e).lower()
+    return any(k in s for k in (
+        "out of memory", "cudacachingallocator", "cuda error",
+        "cublas", "alloc",
+    ))
+
+
+def _save_partial(results: dict, out_path):
+    """Persist results after each step so a later crash never loses prior data."""
+    if out_path is None:
+        return
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w") as f:
+        json.dump(results, f, indent=2)
+
+
 def run_benchmarks(
     model_keys: list[str],
     seq_lengths: list[int],
     batch_sizes: list[int],
     device: str,
+    max_train_seqlen: int | None = None,
+    out_path=None,
 ):
-    """Run all benchmarks and return results dict."""
+    """Run all benchmarks and return results dict.
+
+    Results are written to out_path after every (model, seq_len) so a crash at
+    an extreme config preserves everything measured so far. Forward+backward
+    measurements (training throughput, peak memory) are skipped above
+    max_train_seqlen, where batch=16 OOMs even on an 80GB card.
+    """
     results = {}
 
     for model_key in model_keys:
@@ -178,6 +205,7 @@ def run_benchmarks(
         for seq_len in seq_lengths:
             print(f"\n  {model_name} @ seq_len={seq_len}")
             length_results = {}
+            train_ok = max_train_seqlen is None or seq_len <= max_train_seqlen
 
             try:
                 model = build_fn(max(seq_len, 256)).to(device)  # min max_len=256 for pos emb
@@ -189,49 +217,57 @@ def run_benchmarks(
                         length_results[f"latency_b{bs}"] = lat
                         print(f"    Inference (batch={bs}): {lat['median_ms']:.1f}ms")
                     except RuntimeError as e:
-                        if "out of memory" in str(e).lower():
+                        if _is_oom(e):
                             length_results[f"latency_b{bs}"] = {"oom": True}
                             print(f"    Inference (batch={bs}): OOM")
                             torch.cuda.empty_cache()
                         else:
                             raise
 
-                # Training throughput (batch=16)
-                try:
-                    train_bs = min(16, batch_sizes[-1])
-                    thr = measure_training_step(model, seq_len, train_bs, device)
-                    length_results["training"] = thr
-                    print(f"    Training (batch={train_bs}): "
-                          f"{thr['median_ms']:.1f}ms, {thr['seqs_per_s']:.0f} seq/s")
-                except RuntimeError as e:
-                    if "out of memory" in str(e).lower():
-                        length_results["training"] = {"oom": True}
-                        print(f"    Training: OOM")
-                        torch.cuda.empty_cache()
-                    else:
-                        raise
+                # Forward+backward (training throughput + peak memory)
+                if not train_ok:
+                    length_results["training"] = {"skipped": True}
+                    length_results["memory"] = {"skipped": True}
+                    print(f"    Training/memory: skipped (seq_len > "
+                          f"{max_train_seqlen}, fwd+bwd OOMs)")
+                else:
+                    try:
+                        train_bs = min(16, batch_sizes[-1])
+                        thr = measure_training_step(model, seq_len, train_bs, device)
+                        length_results["training"] = thr
+                        print(f"    Training (batch={train_bs}): "
+                              f"{thr['median_ms']:.1f}ms, {thr['seqs_per_s']:.0f} seq/s")
+                    except RuntimeError as e:
+                        if _is_oom(e):
+                            length_results["training"] = {"oom": True}
+                            print(f"    Training: OOM")
+                            torch.cuda.empty_cache()
+                        else:
+                            raise
 
-                # Peak memory
-                try:
-                    mem = measure_peak_memory(model, seq_len, 16, device)
-                    length_results["memory"] = mem
-                    print(f"    Peak memory: {mem['fwd_bwd_mb']} MB")
-                except RuntimeError as e:
-                    if "out of memory" in str(e).lower():
-                        length_results["memory"] = {"oom": True}
-                        print(f"    Peak memory: OOM")
-                        torch.cuda.empty_cache()
-                    else:
-                        raise
+                    try:
+                        mem = measure_peak_memory(model, seq_len, 16, device)
+                        length_results["memory"] = mem
+                        print(f"    Peak memory: {mem['fwd_bwd_mb']} MB")
+                    except RuntimeError as e:
+                        if _is_oom(e):
+                            length_results["memory"] = {"oom": True}
+                            print(f"    Peak memory: OOM")
+                            torch.cuda.empty_cache()
+                        else:
+                            raise
 
                 model.cpu()
                 del model
 
             except RuntimeError as e:
-                if "out of memory" in str(e).lower():
+                if _is_oom(e):
                     length_results["build"] = {"oom": True}
                     print(f"    Model build: OOM")
                 else:
+                    # Persist what we have before propagating an unexpected error.
+                    results[model_key]["lengths"][str(seq_len)] = length_results
+                    _save_partial(results, out_path)
                     raise
 
             gc.collect()
@@ -239,6 +275,7 @@ def run_benchmarks(
                 torch.cuda.empty_cache()
 
             results[model_key]["lengths"][str(seq_len)] = length_results
+            _save_partial(results, out_path)
 
     return results
 
@@ -366,6 +403,11 @@ def main():
                         help="Comma-separated seq lengths (default: 64-16384)")
     parser.add_argument("--batch-sizes", type=str, default="1,32",
                         help="Comma-separated batch sizes for latency")
+    parser.add_argument("--max-train-seqlen", type=int, default=8192,
+                        help="Skip fwd+bwd (training throughput / peak memory) "
+                             "above this seq_len; batch=16 OOMs even on 80GB. "
+                             "Inference latency is still measured at all lengths. "
+                             "Use 0 to attempt fwd+bwd at every length.")
     parser.add_argument("--device", type=str, default=None)
     args = parser.parse_args()
 
@@ -388,33 +430,42 @@ def main():
     print(f"  Hardware: {capture_hardware_info()}")
     print("=" * 70)
 
+    max_train_seqlen = args.max_train_seqlen or None
+
     init_wandb(
         experiment="exp2_efficiency", run_name="efficiency",
         config={"models": model_keys, "seq_lengths": seq_lengths,
-                "batch_sizes": batch_sizes, "device": device},
+                "batch_sizes": batch_sizes, "device": device,
+                "max_train_seqlen": max_train_seqlen},
         job_type="benchmark",
     )
 
-    results = run_benchmarks(model_keys, seq_lengths, batch_sizes, device)
-
-    # Save results
     out_path = RESULTS_DIR / "scaling_results.json"
-    with open(out_path, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"\n  Saved: {out_path}")
-
-    # Push to W&B: per-seq-length curves, full summary, and the raw JSON.
-    for seq_len in seq_lengths:
-        point = {
-            mk: mres["lengths"][str(seq_len)]
-            for mk, mres in results.items()
-            if str(seq_len) in mres.get("lengths", {})
-        }
-        if point:
-            wandb_log(point, step=seq_len)
-    wandb_summary(results)
-    wandb_log_artifact(out_path, "scaling_results", "efficiency")
-    finish_wandb()
+    results = {}
+    try:
+        results = run_benchmarks(
+            model_keys, seq_lengths, batch_sizes, device,
+            max_train_seqlen=max_train_seqlen, out_path=out_path,
+        )
+    finally:
+        # run_benchmarks saves incrementally; recover partial results if it
+        # crashed mid-run so W&B and the JSON always reflect what was measured.
+        if not results and out_path.exists():
+            with open(out_path) as f:
+                results = json.load(f)
+        if results:
+            print(f"\n  Saved: {out_path}")
+            for seq_len in seq_lengths:
+                point = {
+                    mk: mres["lengths"][str(seq_len)]
+                    for mk, mres in results.items()
+                    if str(seq_len) in mres.get("lengths", {})
+                }
+                if point:
+                    wandb_log(point, step=seq_len)
+            wandb_summary(results)
+            wandb_log_artifact(out_path, "scaling_results", "efficiency")
+        finish_wandb()
 
     # Generate plots
     for bs in batch_sizes:
