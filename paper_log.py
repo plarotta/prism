@@ -12,6 +12,7 @@ Each training run creates a self-contained directory under results/paper/:
 """
 
 import json
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -19,6 +20,102 @@ from pathlib import Path
 import torch
 
 RESULTS_ROOT = Path("results") / "paper"
+
+
+# ---------------------------------------------------------------------------
+# Weights & Biases integration (optional, graceful no-op if unavailable)
+# ---------------------------------------------------------------------------
+#
+# Enabled by default; pushes config, training curves, eval metrics, and final
+# summaries to W&B so paper results land on the dashboard. Disable with
+# PRISM_WANDB=0 or WANDB_MODE=disabled. Configure target with WANDB_PROJECT
+# (default "prism") and WANDB_ENTITY.
+
+_WANDB_RUN = None
+
+
+def _wandb_enabled() -> bool:
+    if os.environ.get("PRISM_WANDB", "1").lower() in ("0", "false", "no"):
+        return False
+    if os.environ.get("WANDB_MODE", "").lower() == "disabled":
+        return False
+    return True
+
+
+def _flatten(d: dict, prefix: str = "") -> dict:
+    """Flatten nested dict/scalar metrics for W&B logging (skips non-numerics)."""
+    out = {}
+    for k, v in d.items():
+        key = f"{prefix}{k}"
+        if isinstance(v, dict):
+            out.update(_flatten(v, prefix=f"{key}/"))
+        elif isinstance(v, bool):
+            out[key] = int(v)
+        elif isinstance(v, (int, float)):
+            out[key] = v
+    return out
+
+
+def init_wandb(experiment: str, run_name: str, config: dict | None = None,
+               job_type: str = "train"):
+    """Start a W&B run if the package is installed and logging is enabled.
+
+    Returns the run object, or None if W&B is unavailable/disabled. Safe to
+    call unconditionally — all other wandb_* helpers no-op when this returns
+    None.
+    """
+    global _WANDB_RUN
+    if not _wandb_enabled():
+        return None
+    try:
+        import wandb
+    except ImportError:
+        print("  [wandb] not installed — skipping (run `uv add wandb` to enable)")
+        return None
+
+    full_config = dict(config or {})
+    full_config.setdefault("hardware", capture_hardware_info())
+    full_config.setdefault("git_hash", _get_git_hash())
+    _WANDB_RUN = wandb.init(
+        project=os.environ.get("WANDB_PROJECT", "prism"),
+        entity=os.environ.get("WANDB_ENTITY") or None,
+        group=experiment,
+        job_type=job_type,
+        name=run_name,
+        config=full_config,
+        reinit=True,
+    )
+    return _WANDB_RUN
+
+
+def wandb_log(data: dict, step: int | None = None):
+    """Log a dict of metrics to the active W&B run (no-op if none)."""
+    if _WANDB_RUN is not None:
+        _WANDB_RUN.log(_flatten(data), step=step)
+
+
+def wandb_summary(data: dict):
+    """Update the active W&B run's summary (no-op if none)."""
+    if _WANDB_RUN is not None:
+        _WANDB_RUN.summary.update(_flatten(data))
+
+
+def wandb_log_artifact(path: Path, name: str, artifact_type: str = "results"):
+    """Attach a file (e.g. results JSON) to the active W&B run."""
+    if _WANDB_RUN is None:
+        return
+    import wandb
+    art = wandb.Artifact(name, type=artifact_type)
+    art.add_file(str(path))
+    _WANDB_RUN.log_artifact(art)
+
+
+def finish_wandb():
+    """Close the active W&B run (no-op if none)."""
+    global _WANDB_RUN
+    if _WANDB_RUN is not None:
+        _WANDB_RUN.finish()
+        _WANDB_RUN = None
 
 
 def create_run_dir(experiment: str, model_name: str, run_id: int = 0) -> Path:
@@ -80,11 +177,12 @@ def save_config(run_dir: Path, config: dict):
 
 
 def log_step(run_dir: Path, step: int, metrics: dict):
-    """Append one JSON line to train_log.jsonl."""
+    """Append one JSON line to train_log.jsonl (and stream to W&B)."""
     entry = {"step": step, **metrics}
     path = run_dir / "train_log.jsonl"
     with open(path, "a") as f:
         f.write(json.dumps(entry) + "\n")
+    wandb_log({f"train/{k}": v for k, v in metrics.items()}, step=step)
 
 
 def save_checkpoint(run_dir: Path, model, optimizer, step: int):
@@ -108,18 +206,20 @@ def load_checkpoint(path: Path, model, optimizer=None):
 
 
 def save_eval_results(run_dir: Path, step: int, benchmark: str, results: dict):
-    """Save eval results for a specific checkpoint and benchmark."""
+    """Save eval results for a specific checkpoint and benchmark (and to W&B)."""
     path = run_dir / "eval" / f"step_{step}_{benchmark}.json"
     with open(path, "w") as f:
         json.dump({"step": step, "benchmark": benchmark, **results}, f, indent=2)
+    wandb_log({f"{benchmark}/{k}": v for k, v in results.items()}, step=step)
     return path
 
 
 def save_final_metrics(run_dir: Path, metrics: dict):
-    """Save summary metrics at end of run."""
+    """Save summary metrics at end of run (and to the W&B run summary)."""
     path = run_dir / "final_metrics.json"
     with open(path, "w") as f:
         json.dump(metrics, f, indent=2)
+    wandb_summary({f"final/{k}": v for k, v in metrics.items()})
     return path
 
 

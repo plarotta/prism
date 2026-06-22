@@ -33,7 +33,7 @@ from data.msmarco import MSMARCODataset
 from data.loco_eval import evaluate_locov1
 
 from prism import prism_small, PRISMForEmbedding
-from benchmark_ablations import MeanPooling, NoInterference
+from paper_components import MeanPooling, NoInterference
 from baseline_transformer import transformer_small, TransformerForEmbedding
 from mamba_bidir import build_mamba_bidir_small
 from linear_rnn import build_linear_rnn_small

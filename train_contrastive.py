@@ -27,6 +27,8 @@ from paper_log import (
     save_checkpoint,
     save_eval_results,
     save_final_metrics,
+    init_wandb,
+    finish_wandb,
 )
 
 
@@ -147,6 +149,14 @@ def train(
     }
     save_config(run_dir, config)
 
+    # W&B run (no-op if wandb unavailable / disabled)
+    init_wandb(
+        experiment=config.get("experiment", "exp"),
+        run_name=run_dir.name,
+        config=config,
+        job_type="train",
+    )
+
     # Setup
     model_wrapper = model_wrapper.to(device)
     total_params = sum(p.numel() for p in model_wrapper.parameters())
@@ -242,8 +252,14 @@ def train(
             eval_results = eval_fn(model_wrapper, step)
             save_eval_results(run_dir, step, "eval", eval_results)
 
-            metric_val = eval_results.get("locov1_avg_ndcg@10",
-                         eval_results.get("avg_ndcg@10", 0))
+            # Prefer long-doc nDCG@10 when available, else MS MARCO dev MRR@10.
+            metric_val = eval_results.get(
+                "locov1_avg_ndcg@10",
+                eval_results.get(
+                    "avg_ndcg@10",
+                    eval_results.get("msmarco_dev_mrr@10", 0),
+                ),
+            )
             if metric_val > best_metric:
                 best_metric = metric_val
                 best_step = step
@@ -251,7 +267,7 @@ def train(
                 save_checkpoint(run_dir, model_wrapper, optimizer, step)
 
             print(f"  [step {step}] Eval: "
-                  f"nDCG@10={metric_val:.4f}  "
+                  f"metric={metric_val:.4f}  "
                   f"(best={best_metric:.4f} @ step {best_step})")
 
             model_wrapper.train()
@@ -292,5 +308,6 @@ def train(
         "stopped_early": stopped_early,
     }
     save_final_metrics(run_dir, final)
+    finish_wandb()
 
     return final

@@ -22,11 +22,14 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from paper_log import create_run_dir, save_config, capture_hardware_info
+from paper_log import (
+    create_run_dir, save_config, capture_hardware_info,
+    init_wandb, wandb_log, wandb_summary, wandb_log_artifact, finish_wandb,
+)
 
 # Model builders (same as exp1)
 from prism import prism_small, PRISMForEmbedding
-from benchmark_ablations import MeanPooling, NoInterference
+from paper_components import MeanPooling, NoInterference
 from baseline_transformer import transformer_small, TransformerForEmbedding
 from mamba_bidir import build_mamba_bidir_small
 from linear_rnn import build_linear_rnn_small
@@ -385,6 +388,13 @@ def main():
     print(f"  Hardware: {capture_hardware_info()}")
     print("=" * 70)
 
+    init_wandb(
+        experiment="exp2_efficiency", run_name="efficiency",
+        config={"models": model_keys, "seq_lengths": seq_lengths,
+                "batch_sizes": batch_sizes, "device": device},
+        job_type="benchmark",
+    )
+
     results = run_benchmarks(model_keys, seq_lengths, batch_sizes, device)
 
     # Save results
@@ -392,6 +402,19 @@ def main():
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\n  Saved: {out_path}")
+
+    # Push to W&B: per-seq-length curves, full summary, and the raw JSON.
+    for seq_len in seq_lengths:
+        point = {
+            mk: mres["lengths"][str(seq_len)]
+            for mk, mres in results.items()
+            if str(seq_len) in mres.get("lengths", {})
+        }
+        if point:
+            wandb_log(point, step=seq_len)
+    wandb_summary(results)
+    wandb_log_artifact(out_path, "scaling_results", "efficiency")
+    finish_wandb()
 
     # Generate plots
     for bs in batch_sizes:

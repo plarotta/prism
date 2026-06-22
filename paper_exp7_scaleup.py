@@ -28,7 +28,7 @@ from data.msmarco import MSMARCODataset
 from data.loco_eval import evaluate_locov1
 
 from prism import PRISMEncoder, PRISMForEmbedding
-from benchmark_ablations import MeanPooling, NoInterference
+from paper_components import MeanPooling, NoInterference
 from baseline_transformer import TransformerEncoder, TransformerForEmbedding
 
 TOKENIZER_NAME = "bert-base-uncased"

@@ -21,21 +21,22 @@ Usage:
 import argparse
 import json
 import time
+import traceback
 from pathlib import Path
 
 import torch
 from transformers import AutoTokenizer
 
-from paper_log import create_run_dir
+from paper_log import create_run_dir, finish_wandb
 from train_contrastive import train
-from data.msmarco import MSMARCODataset
+from data.msmarco import MSMARCODataset, evaluate_msmarco_dev
 from data.loco_eval import evaluate_locov1
 
 # Model builders
 from prism import prism_small, PRISMForEmbedding
-from benchmark_ablations import MeanPooling, NoInterference
+from paper_components import MeanPooling, NoInterference
 from baseline_transformer import transformer_small, TransformerForEmbedding
-from mamba_bidir import build_mamba_bidir_small
+from mamba_bidir import build_mamba_bidir_small, MAMBA_AVAILABLE
 from linear_rnn import build_linear_rnn_small
 
 TOKENIZER_NAME = "bert-base-uncased"
@@ -134,11 +135,23 @@ SUB_EXPERIMENTS = {
 # Eval callback factory
 # ---------------------------------------------------------------------------
 
-def make_eval_fn(tokenizer, eval_max_len, device, do_locov1=True):
-    """Create an eval callback for use during training."""
+def make_eval_fn(tokenizer, dataset, eval_max_len, device, do_locov1=True):
+    """Create an eval callback for use during training.
+
+    Always runs MS MARCO dev retrieval (MRR@10 / Recall) so short/medium
+    sub-experiments (1a/1b) have a quality metric. Adds LoCoV1 zero-shot
+    nDCG@10 for the long-doc sub-experiments (1c-1e).
+    """
 
     def eval_fn(model_wrapper, step):
         results = {}
+
+        dev = evaluate_msmarco_dev(
+            model_wrapper, dataset, max_len=eval_max_len,
+            batch_size=64, device=device,
+        )
+        results.update(dev)
+
         if do_locov1:
             loco = evaluate_locov1(
                 model_wrapper, tokenizer, max_len=eval_max_len,
@@ -167,10 +180,21 @@ def run_one(
     checkpoint_every: int = 10000,
     device: str | None = None,
     seed: int = 42,
+    allow_mamba_fallback: bool = False,
 ):
     """Train one model for one sub-experiment."""
     sub_exp = SUB_EXPERIMENTS[sub_exp_id]
     model_name, build_fn = MODEL_BUILDERS[model_key]
+
+    # Guard: never silently train the SimpleDiagSSM fallback as the Mamba
+    # baseline — it is not a faithful Mamba and would invalidate the comparison.
+    if model_key == "mamba" and not MAMBA_AVAILABLE and not allow_mamba_fallback:
+        raise RuntimeError(
+            "mamba_ssm is not installed, so the Mamba baseline would fall back "
+            "to SimpleDiagSSM (NOT a faithful Mamba). Install it on the GPU box "
+            "(`uv add mamba-ssm causal-conv1d`), or pass --allow-mamba-fallback "
+            "to deliberately run the approximate fallback."
+        )
 
     print(f"\n{'='*70}")
     print(f"Experiment 1{sub_exp_id[1:]}: {sub_exp['desc']}")
@@ -194,7 +218,7 @@ def run_one(
 
     # Eval callback
     eval_fn = make_eval_fn(
-        tokenizer, sub_exp["eval_max_len"], device,
+        tokenizer, dataset, sub_exp["eval_max_len"], device,
         do_locov1=sub_exp.get("eval_locov1", False),
     )
 
@@ -259,6 +283,9 @@ def main():
     parser.add_argument("--eval-every", type=int, default=5000)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--allow-mamba-fallback", action="store_true",
+                        help="Run the approximate SimpleDiagSSM if mamba_ssm "
+                             "is missing (NOT a faithful Mamba baseline)")
     args = parser.parse_args()
 
     if args.smoke_test:
@@ -293,17 +320,31 @@ def main():
                 print(f"Unknown model: {model_key}. "
                       f"Choose from: {list(MODEL_BUILDERS.keys())}")
                 continue
-            run_one(
-                sub_exp_id=sub_exp_id,
-                model_key=model_key,
-                n_steps=args.n_steps,
-                micro_batch=args.micro_batch,
-                grad_accum=args.grad_accum,
-                lr=args.lr,
-                eval_every=args.eval_every,
-                device=args.device,
-                seed=args.seed,
-            )
+            # Isolate failures: one model crashing must not silently abort the
+            # rest of the sweep, and the traceback must be recorded.
+            try:
+                run_one(
+                    sub_exp_id=sub_exp_id,
+                    model_key=model_key,
+                    n_steps=args.n_steps,
+                    micro_batch=args.micro_batch,
+                    grad_accum=args.grad_accum,
+                    lr=args.lr,
+                    eval_every=args.eval_every,
+                    device=args.device,
+                    seed=args.seed,
+                    allow_mamba_fallback=args.allow_mamba_fallback,
+                )
+            except Exception:
+                finish_wandb()  # close the crashed run's W&B session, if any
+                tb = traceback.format_exc()
+                err_dir = Path("results/paper") / f"exp1_{sub_exp_id}"
+                err_dir.mkdir(parents=True, exist_ok=True)
+                err_path = err_dir / f"{model_key}_ERROR.txt"
+                err_path.write_text(tb)
+                print(f"\n!!! {model_key} (exp1_{sub_exp_id}) FAILED — "
+                      f"traceback saved to {err_path}\n{tb}")
+                continue
 
     print("\n=== All runs complete ===")
 

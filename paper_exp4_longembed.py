@@ -20,11 +20,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from transformers import AutoTokenizer
 
-from paper_log import capture_hardware_info
+from paper_log import (
+    capture_hardware_info,
+    init_wandb, wandb_summary, wandb_log_artifact, finish_wandb,
+)
 from data.longembed_eval import evaluate_longembed, LONGEMBED_TASKS
 
 from prism import prism_small, PRISMForEmbedding
-from benchmark_ablations import MeanPooling, NoInterference
+from paper_components import MeanPooling, NoInterference
 from baseline_transformer import transformer_small, TransformerForEmbedding
 from mamba_bidir import build_mamba_bidir_small
 from linear_rnn import build_linear_rnn_small
@@ -241,6 +244,13 @@ def main():
         parser.error("Specify --exp1-dir or --checkpoints")
         return
 
+    init_wandb(
+        experiment="exp4_longembed", run_name="longembed",
+        config={"max_lens": max_lens, "device": device,
+                "checkpoints": {k: str(v) for k, v in checkpoint_map.items()}},
+        job_type="eval",
+    )
+
     all_results = {}
     for model_key, ckpt_path in checkpoint_map.items():
         if model_key not in MODEL_BUILDERS:
@@ -257,6 +267,10 @@ def main():
     with open(out_path, "w") as f:
         json.dump(all_results, f, indent=2, default=str)
     print(f"\n  Saved: {out_path}")
+
+    wandb_summary(all_results)
+    wandb_log_artifact(out_path, "longembed_results", "eval")
+    finish_wandb()
 
     # Generate plots
     if all_results:

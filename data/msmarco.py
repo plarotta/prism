@@ -329,6 +329,120 @@ class MSMARCODataset:
 
 
 # ---------------------------------------------------------------------------
+# Dev-set retrieval evaluation (MRR@10 / Recall)
+# ---------------------------------------------------------------------------
+
+
+@torch.no_grad()
+def _encode_batch(model_wrapper, token_ids_list, max_len, batch_size, device):
+    """Encode token-id sequences into L2-normalized embeddings (on CPU)."""
+    all_embs = []
+    for i in range(0, len(token_ids_list), batch_size):
+        ids, masks = _collate(token_ids_list[i:i + batch_size], max_len)
+        ids, masks = ids.to(device), masks.to(device)
+        emb = model_wrapper.encode(ids, masks)
+        all_embs.append(emb.float().cpu())
+    return torch.cat(all_embs, dim=0)
+
+
+@torch.no_grad()
+def evaluate_msmarco_dev(
+    model_wrapper,
+    dataset: "MSMARCODataset",
+    max_len: int,
+    batch_size: int = 64,
+    device: str = "cuda",
+    max_queries: int | None = 2000,
+    seed: int = 0,
+) -> dict:
+    """Ranked retrieval on the MS MARCO dev split.
+
+    Each dev query is ranked against a pool of all dev positive passages
+    (one relevant passage per query, distractors = other queries' positives).
+    This is a standard small-corpus dev proxy for MRR@10 / Recall during
+    training — fast enough to run as an eval callback, and disjoint from the
+    long-doc benchmarks (LoCoV1/LongEmbed/BEIR).
+
+    Returns:
+        {
+            "msmarco_dev_mrr@10": float,
+            "msmarco_dev_recall@10": float,
+            "msmarco_dev_recall@100": float,
+            "n_queries": int,
+            "n_pool": int,
+            "eval_time_s": float,
+        }
+    """
+    model_wrapper.eval()
+    t0 = time.perf_counter()
+
+    dev_queries, dev_qrels = dataset.get_dev_data()
+
+    # Keep only queries whose positive passage is present in the corpus.
+    qids = [
+        qid for qid in dev_queries
+        if qid in dev_qrels and any(p in dataset.passages for p in dev_qrels[qid])
+    ]
+    if max_queries is not None and len(qids) > max_queries:
+        rng = random.Random(seed)
+        qids = rng.sample(qids, max_queries)
+
+    if not qids:
+        return {
+            "msmarco_dev_mrr@10": 0.0,
+            "msmarco_dev_recall@10": 0.0,
+            "msmarco_dev_recall@100": 0.0,
+            "n_queries": 0,
+            "n_pool": 0,
+            "eval_time_s": round(time.perf_counter() - t0, 1),
+        }
+
+    # Build candidate pool: union of relevant passages across the eval queries.
+    pool_pids = []
+    seen = set()
+    for qid in qids:
+        for pid in dev_qrels[qid]:
+            if pid in dataset.passages and pid not in seen:
+                seen.add(pid)
+                pool_pids.append(pid)
+    pid_to_idx = {pid: i for i, pid in enumerate(pool_pids)}
+
+    pool_embs = _encode_batch(
+        model_wrapper, [dataset.passages[pid] for pid in pool_pids],
+        max_len, batch_size, device,
+    )
+    query_embs = _encode_batch(
+        model_wrapper, [dev_queries[qid] for qid in qids],
+        max_len, batch_size, device,
+    )
+
+    sim = torch.matmul(query_embs, pool_embs.T)  # (n_q, n_pool)
+    ranks = sim.argsort(dim=1, descending=True)
+
+    rr_sum, r10, r100 = 0.0, 0, 0
+    for i, qid in enumerate(qids):
+        relevant = {pid_to_idx[p] for p in dev_qrels[qid] if p in pid_to_idx}
+        ranked = ranks[i].tolist()
+        for rank, idx in enumerate(ranked[:100], start=1):
+            if idx in relevant:
+                if rank <= 10:
+                    rr_sum += 1.0 / rank
+                    r10 += 1
+                r100 += 1
+                break
+
+    n = len(qids)
+    return {
+        "msmarco_dev_mrr@10": rr_sum / n,
+        "msmarco_dev_recall@10": r10 / n,
+        "msmarco_dev_recall@100": r100 / n,
+        "n_queries": n,
+        "n_pool": len(pool_pids),
+        "eval_time_s": round(time.perf_counter() - t0, 1),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 

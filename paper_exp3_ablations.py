@@ -44,7 +44,7 @@ from prism import (
     StratifiedRecurrence, _fast_fixed_decay_scan,
     CrossScaleInterference, AttentiveCovariancePooling, AttentivePooling,
 )
-from benchmark_ablations import MeanPooling, NoInterference, LearnedDecayRecurrence
+from paper_components import MeanPooling, NoInterference, LearnedDecayRecurrence
 
 TOKENIZER_NAME = "bert-base-uncased"
 VOCAB_SIZE = 30522
