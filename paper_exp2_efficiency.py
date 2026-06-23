@@ -385,7 +385,7 @@ def plot_scaling_curves(results, seq_lengths, batch_size=32):
     ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    out_path = RESULTS_DIR / "scaling_curves.png"
+    out_path = RESULTS_DIR / f"scaling_curves_b{batch_size}.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close("all")
     print(f"\n  Saved: {out_path}")

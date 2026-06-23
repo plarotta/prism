@@ -90,8 +90,10 @@ def train(
     device: str | None = None,
     seed: int = 42,
     compile: bool = False,
-    early_stop_patience: int = 3000,
+    early_stop_patience: int = 0,
     early_stop_min_improvement: float = 0.05,
+    eval_early_stop_patience: int = 2,
+    eval_early_stop_min_improvement: float = 0.01,
 ):
     """Train a contrastive embedding model with structured logging.
 
@@ -178,6 +180,9 @@ def train(
     best_step = 0
     all_losses = []
     t0 = time.perf_counter()
+    stop_reason = None
+    evals_since_improve = 0
+    es_reference = None  # eval metric at last significant improvement
 
     print(f"  Training for {n_steps} steps "
           f"(micro_batch={micro_batch}, accum={grad_accum}, "
@@ -185,8 +190,11 @@ def train(
     print(f"  LR: {lr} with {warmup_steps} warmup steps, cosine decay")
     print(f"  Eval every {eval_every} steps, checkpoint every {checkpoint_every} steps")
     if early_stop_patience > 0:
-        print(f"  Early stopping: patience={early_stop_patience}, "
+        print(f"  Loss-plateau early stopping: patience={early_stop_patience}, "
               f"min_improvement={early_stop_min_improvement:.1%}")
+    if eval_early_stop_patience > 0 and eval_fn is not None:
+        print(f"  Eval-metric early stopping: patience={eval_early_stop_patience} "
+              f"evals, min_improvement={eval_early_stop_min_improvement:.1%}")
 
     # AMP setup (bf16 on CUDA, no scaler needed for bf16)
     use_amp = (device == "cuda" and torch.cuda.is_bf16_supported())
@@ -270,6 +278,34 @@ def train(
                   f"metric={metric_val:.4f}  "
                   f"(best={best_metric:.4f} @ step {best_step})")
 
+            # --- Eval-metric early stopping (quality plateau) ---
+            # Stops when the eval metric stops improving — the right signal for
+            # contrastive runs whose training loss keeps falling after quality
+            # has saturated. Best checkpoint is already saved above.
+            if eval_early_stop_patience > 0:
+                if es_reference is None or es_reference <= 0:
+                    es_reference = metric_val
+                    evals_since_improve = 0
+                else:
+                    rel_gain = (metric_val - es_reference) / es_reference
+                    if rel_gain >= eval_early_stop_min_improvement:
+                        es_reference = metric_val
+                        evals_since_improve = 0
+                    else:
+                        evals_since_improve += 1
+                        print(f"  [step {step}] Eval metric plateau "
+                              f"{evals_since_improve}/{eval_early_stop_patience} "
+                              f"(Δ={rel_gain:+.1%} vs {es_reference:.4f})")
+                        if evals_since_improve >= eval_early_stop_patience:
+                            print(f"  [step {step}] Early stopping: eval metric "
+                                  f"plateaued (<{eval_early_stop_min_improvement:.1%} "
+                                  f"over {eval_early_stop_patience} evals, "
+                                  f"best={best_metric:.4f} @ step {best_step})")
+                            stopped_early = True
+                            stop_reason = "eval_metric_plateau"
+                            model_wrapper.train()
+                            break
+
             model_wrapper.train()
 
         # --- Early stopping (loss plateau) ---
@@ -291,6 +327,7 @@ def train(
                 # Save final checkpoint before stopping
                 save_checkpoint(run_dir, model_wrapper, optimizer, step)
                 stopped_early = True
+                stop_reason = "loss_plateau"
                 break
 
     # --- Final ---
@@ -306,6 +343,7 @@ def train(
         "total_params": total_params,
         "n_steps_completed": steps_completed,
         "stopped_early": stopped_early,
+        "stop_reason": stop_reason,
     }
     save_final_metrics(run_dir, final)
     finish_wandb()

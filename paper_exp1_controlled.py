@@ -181,6 +181,8 @@ def run_one(
     device: str | None = None,
     seed: int = 42,
     allow_mamba_fallback: bool = False,
+    eval_early_stop_patience: int = 2,
+    eval_early_stop_min_improvement: float = 0.01,
 ):
     """Train one model for one sub-experiment."""
     sub_exp = SUB_EXPERIMENTS[sub_exp_id]
@@ -255,6 +257,8 @@ def run_one(
         eval_fn=eval_fn,
         device=device,
         seed=seed,
+        eval_early_stop_patience=eval_early_stop_patience,
+        eval_early_stop_min_improvement=eval_early_stop_min_improvement,
     )
 
     print(f"\n  {model_name} complete: best nDCG@10={result['best_metric']:.4f} "
@@ -286,6 +290,12 @@ def main():
     parser.add_argument("--allow-mamba-fallback", action="store_true",
                         help="Run the approximate SimpleDiagSSM if mamba_ssm "
                              "is missing (NOT a faithful Mamba baseline)")
+    parser.add_argument("--eval-early-stop-patience", type=int, default=2,
+                        help="Stop after N consecutive evals without sufficient "
+                             "eval-metric improvement (0 to disable)")
+    parser.add_argument("--eval-early-stop-min-improvement", type=float, default=0.01,
+                        help="Min relative eval-metric gain per eval to count as "
+                             "improvement (default 0.01 = 1%%)")
     args = parser.parse_args()
 
     if args.smoke_test:
@@ -334,6 +344,8 @@ def main():
                     device=args.device,
                     seed=args.seed,
                     allow_mamba_fallback=args.allow_mamba_fallback,
+                    eval_early_stop_patience=args.eval_early_stop_patience,
+                    eval_early_stop_min_improvement=args.eval_early_stop_min_improvement,
                 )
             except Exception:
                 finish_wandb()  # close the crashed run's W&B session, if any
