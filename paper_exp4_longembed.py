@@ -67,12 +67,27 @@ def load_checkpoint_into_model(model, checkpoint_path, device="cpu"):
 
 
 def find_best_checkpoint(run_dir: Path) -> Path | None:
-    """Find the best checkpoint in a run directory."""
+    """Return the best checkpoint for a run.
+
+    Prefers `best_step` from final_metrics.json (the highest-eval-metric
+    checkpoint); falls back to the numerically-latest checkpoint. Steps are
+    parsed as ints — a lexicographic sort mis-orders step_5000 vs step_50000.
+    """
     ckpt_dir = run_dir / "checkpoints"
     if not ckpt_dir.exists():
         return None
-    checkpoints = sorted(ckpt_dir.glob("step_*.pt"))
-    return checkpoints[-1] if checkpoints else None
+    by_step = {int(p.stem.split("_")[1]): p for p in ckpt_dir.glob("step_*.pt")}
+    if not by_step:
+        return None
+    fm = run_dir / "final_metrics.json"
+    if fm.exists():
+        try:
+            best_step = json.loads(fm.read_text()).get("best_step")
+            if best_step in by_step:
+                return by_step[best_step]
+        except Exception:
+            pass
+    return by_step[max(by_step)]
 
 
 def eval_model_longembed(

@@ -19,6 +19,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+try:
+    from prism_scan_kernel import fused_decay_scan, fused_scan_available
+except Exception:  # pragma: no cover - kernel module optional
+    fused_decay_scan = None
+
+    def fused_scan_available() -> bool:
+        return False
+
 # ---------------------------------------------------------------------------
 # Utility: Hadamard-block initialisation
 # ---------------------------------------------------------------------------
@@ -171,11 +179,15 @@ class StratifiedRecurrence(nn.Module):
         n_channels: int,
         max_len: int = 8192,
         bidirectional: bool = True,
+        use_fused_scan: bool = True,
     ):
         super().__init__()
         self.d_c = d_c
         self.n_channels = n_channels
         self.bidirectional = bidirectional
+        # Use the fused Triton scan when available (CUDA + Triton); otherwise the
+        # PyTorch doubling scan below is used as an automatic fallback.
+        self.use_fused_scan = use_fused_scan
 
         # Fixed geometric decay rates: λ_c = 1 - 2^{-(c-1)·Δ}
         delta = math.log2(max_len) / max(n_channels - 1, 1)
@@ -223,6 +235,17 @@ class StratifiedRecurrence(nn.Module):
         for z_c, gate_c in zip(channels, gates):
             g_t = torch.sigmoid(gate_c(z_c))  # (B, T, d_c)
             gated.append(g_t * z_c)
+
+        # Fused path: one Triton kernel handles all channels (any decays) in a
+        # single launch. Used on CUDA when the kernel is available.
+        if (
+            self.use_fused_scan
+            and fused_scan_available()
+            and gated[0].is_cuda
+        ):
+            x = torch.stack(gated, dim=2)               # (B, T, C, d_c)
+            h = fused_decay_scan(x, self.lambdas)       # (B, T, C, d_c)
+            return [h[:, :, c] for c in range(len(gated))]
 
         # Fast path: batch all channels into one scan when all decays are equal
         all_same = all(abs(lam_values[i] - lam_values[0]) < 1e-8

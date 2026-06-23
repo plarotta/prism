@@ -76,17 +76,25 @@ class MSMARCODataset:
         print(f"[msmarco] Loading from cache: {self.cache_dir}")
         t0 = time.perf_counter()
 
-        self.passages = _load_id_to_tokens(self.cache_dir / "passages.jsonl")
         self.train_queries = _load_id_to_tokens(self.cache_dir / "train_queries.jsonl")
         self.train_qrels = _load_id_to_list(self.cache_dir / "train_qrels.jsonl")
         self.dev_queries = _load_id_to_tokens(self.cache_dir / "dev_queries.jsonl")
         self.dev_qrels = _load_id_to_list(self.cache_dir / "dev_qrels.jsonl")
 
-        neg_path = self.cache_dir / "train_negatives.jsonl"
-        if neg_path.exists():
-            self.train_negatives = _load_id_to_list(self.cache_dir / "train_negatives.jsonl")
-        else:
-            self.train_negatives = {}
+        # Load ONLY positive passages (referenced in qrels). Training uses
+        # in-batch negatives only and the dev eval ranks against dev positives,
+        # so the ~30 BM25 hard negatives/query stored on disk are never read —
+        # loading them would cost ~15x the RAM for nothing. See
+        # PAPER_EXPERIMENT_PLAN.md (Implementation Status & Known Deviations).
+        needed_pids = set()
+        for pids in self.train_qrels.values():
+            needed_pids.update(pids)
+        for pids in self.dev_qrels.values():
+            needed_pids.update(pids)
+        self.passages = _load_id_to_tokens_filtered(
+            self.cache_dir / "passages.jsonl", needed_pids,
+        )
+        self.train_negatives = {}  # hard negatives unused by sample_batch
 
         self._train_qids = [
             qid for qid in self.train_qrels
@@ -472,6 +480,21 @@ def _load_id_to_tokens(path: Path) -> dict:
         for line in f:
             row = json.loads(line)
             result[row["id"]] = row["tokens"]
+    return result
+
+
+def _load_id_to_tokens_filtered(path: Path, keep: set) -> dict:
+    """Load {id: token_ids} from JSONL, keeping only ids in `keep`.
+
+    Streams the file so peak RAM is proportional to the kept subset, not the
+    full corpus on disk.
+    """
+    result = {}
+    with open(path) as f:
+        for line in f:
+            row = json.loads(line)
+            if row["id"] in keep:
+                result[row["id"]] = row["tokens"]
     return result
 
 

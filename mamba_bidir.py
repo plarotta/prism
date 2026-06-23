@@ -267,19 +267,20 @@ def build_mamba_bidir_small(
     max_len: int = 8192,
     **kwargs,
 ) -> MambaBidirForEmbedding:
-    """Build a ~20M parameter bidirectional Mamba model.
+    """Build a bidirectional Mamba model parameter-matched to the ~19M baselines.
 
-    With d=384, expand=2, d_state=16, d_conv=4:
-      - Each MambaBidirLayer has ~1.8M params (two Mamba blocks + fusion + FFN)
-      - 8 layers ≈ 14.4M + embeddings ≈ 17M + overhead ≈ ~20M total
-    Adjust n_layers to match target param count.
+    With d=384, d_state=16, d_conv=4 and 2 layers:
+      - expand=2 → ~17.55M params (each MambaBidirLayer ≈ 2.82M)
+      - expand=3 → ~19.5M params  (chosen, to match Transformer 19.02M / PRISM
+        18.46M / Linear-RNN 19.62M; the discrete ~2.8M/layer granularity makes a
+        whole extra layer overshoot to ~20.4M, so widen the SSM instead)
+    NOTE: confirm the exact count from the runner's printed "Parameters:" line on
+    the GPU box — the CPU SimpleDiagSSM fallback has a different param count than
+    real mamba_ssm. Tune `expand`/`n_layers` if it drifts >~5% from 19.0M.
     """
     if not MAMBA_AVAILABLE:
         print("WARNING: mamba_ssm not installed. Using SimpleDiagSSM fallback. "
               "Install mamba-ssm for real Mamba experiments.")
-    # expand=2 with 2 layers gives ~7.9M non-embedding params,
-    # close to PRISM (~6.7M) and Transformer (~7.3M).
-    # Fewer but wider layers — standard Mamba design.
     encoder = MambaBidirEncoder(
         vocab_size=vocab_size,
         d=384,
@@ -288,7 +289,7 @@ def build_mamba_bidir_small(
         max_len=max_len,
         d_state=16,
         d_conv=4,
-        expand=2,
+        expand=3,
         dropout=0.1,
         **kwargs,
     )

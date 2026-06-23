@@ -32,6 +32,46 @@ held-out evaluation. The actual M2-BERT-8K score is ~0.869, not ~0.506.
 
 ---
 
+## Implementation Status & Known Deviations (audited 2026-06-23)
+
+All 7 experiment runners, the 4 baselines, exp3's 10 ablation variants (baseline
++ A–I), exp6's AllNLI/Quora pretrain data, and exp7's 80M config are implemented.
+Deviations between this plan and the code to be aware of:
+
+1. **Training is in-batch-negatives only — no hard negatives, anywhere.** The
+   shared loop (`train_contrastive.train`) calls the model with query+positive
+   only, and no dataset's `sample_batch` returns negatives (exp1 MS MARCO and
+   exp6 AllNLI/Quora both drop them; models and raw data *do* support negatives).
+   **Decision (2026-06-23): in-batch-only is the controlled-comparison protocol**
+   — valid because it's applied identically to all models; report it honestly.
+   Hard negatives + cross-encoder teacher are future work, most relevant to
+   **exp6** (the published-baseline comparison) where its "with hard negatives"
+   note is currently **unmet**.
+
+2. **The in-training MS MARCO metric is a small-pool proxy, not full-corpus
+   MRR@10.** `evaluate_msmarco_dev` ranks each dev query's positive against a
+   ~2k-positive pool — a cheap signal for checkpoint selection / early stopping
+   that saturates near ~0.9. It is **not** comparable to leaderboard MS MARCO
+   MRR@10 (~0.3–0.4); do not report it as such (incl. the summary table's "MS
+   MARCO MRR@10" column). Headline retrieval comes from LoCoV1 / BEIR /
+   LongEmbed; implement full-corpus MS MARCO eval if a real MRR@10 is wanted.
+
+3. **Params are ~17.5–19.6M, not uniformly 20M:** PRISM 18.46M, Transformer
+   19.02M, Linear-RNN 19.62M, **Mamba 17.55M (~8% lighter)**. Tighten Mamba
+   (add a layer / widen) toward ~19M for a clean match, or report exact counts
+   and acknowledge the spread.
+
+4. **Fixed (2026-06-23):** `find_best_checkpoint` (exp4/exp5) sorted checkpoints
+   lexicographically (mis-ordering step_5000 vs step_50000) and returned the
+   latest, not the best — it now parses steps numerically and prefers `best_step`
+   from `final_metrics.json`. Affected which checkpoint LongEmbed/BEIR evaluated.
+
+5. **Fixed (2026-06-23):** MS MARCO loader now loads only positive passages
+   (in-batch-only training never reads the hard negatives), cutting per-process
+   RAM ~15× so short-seq runs can be parallelized on modest-RAM boxes.
+
+---
+
 ## Experiment Overview
 
 | # | Experiment | Purpose | Priority |
@@ -75,8 +115,10 @@ sequence lengths. This is the centerpiece of the paper.
 for contrastive fine-tuning. This is standard, publicly available, and
 completely disjoint from LoCoV1/LongEmbed/BEIR eval sets.
 
-**Loss:** InfoNCE with in-batch negatives + 7 hard negatives per query
-(mined with BM25, then refined with a cross-encoder teacher).
+**Loss:** InfoNCE with **in-batch negatives only**. (The originally-planned
++7 BM25 hard negatives / cross-encoder teacher are not wired through the
+pipeline — adopted in-batch-only as the controlled-comparison protocol on
+2026-06-23. See *Implementation Status & Known Deviations*.)
 
 **Training:**
 - Tokenizer: bert-base-uncased (30,522 vocab)
@@ -152,6 +194,22 @@ are solid but need to be presented more rigorously.
 ### Hardware
 Run on a single standardized GPU. Report exact GPU model, driver version,
 CUDA version, PyTorch version. Ideally A100-80GB for reproducibility.
+
+### Known caveat: short-sequence wall-clock (future work)
+PRISM's recurrence is currently a PyTorch Hillis–Steele doubling scan
+(`O(log T)` kernel launches per scan), so at short/medium sequence lengths it is
+**kernel-launch-bound** and trains slower in wall-clock than the
+parameter-matched Transformer (~5× slower/step at 128 tokens in our runs). Its
+genuine efficiency wins are **memory** (linear vs quadratic) and **asymptotic
+long-sequence** scaling — frame the efficiency story there, and report
+short-seq latency honestly rather than claiming a speedup PRISM doesn't have at
+those lengths.
+
+A **fused chunked-scan kernel** (Triton, or a wrapper over
+flash-linear-attention) would remove the launch overhead and make short-seq
+throughput competitive. Scoped as a standalone task in
+[`FUSED_KERNEL_TASK.md`](FUSED_KERNEL_TASK.md). Out of scope for the initial
+submission unless a reviewer makes short-seq speed load-bearing.
 
 ---
 
