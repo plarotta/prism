@@ -1,5 +1,11 @@
 # PRISM: What We Learned Building a Sub-Quadratic Embedding Encoder
 
+> **Follow-up:** a subsequent audit found that the learned-decay ablation
+> detached decay parameters with `.item()`, and that the Transformer baseline
+> did not disable unused attention-weight output. Padding handling and model
+> selection also needed correction. Those findings qualify conclusions below;
+> they do not establish an architecture breakthrough. See `REVIVAL_REPORT.md`.
+
 *A negative-results writeup. We built a purpose-designed bidirectional
 state-space encoder for text embeddings, found that its novel components didn't
 work, found that the stripped-down remainder showed real promise, and then

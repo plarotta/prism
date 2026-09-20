@@ -29,6 +29,7 @@ from transformers import AutoTokenizer
 
 from paper_log import create_run_dir, save_config, capture_hardware_info
 from train_contrastive import train
+from experiment_protocol import seed_everything, source_validation_callback, evaluate_selected_locov1
 from data.msmarco import MSMARCODataset
 from data.loco_eval import evaluate_locov1
 
@@ -184,19 +185,8 @@ class WeakPairsDataset:
 # Eval callback
 # ---------------------------------------------------------------------------
 
-def make_eval_fn(tokenizer, eval_max_len, device, do_locov1=True):
-    def eval_fn(model_wrapper, step):
-        results = {}
-        if do_locov1:
-            loco = evaluate_locov1(
-                model_wrapper, tokenizer, max_len=eval_max_len,
-                batch_size=32, device=device,
-            )
-            results["locov1_avg_ndcg@10"] = loco["avg_ndcg@10"]
-            results["locov1_per_task"] = loco["per_task"]
-            results["locov1_eval_time_s"] = loco["eval_time_s"]
-        return results
-    return eval_fn
+def make_eval_fn(dataset, eval_max_len, device):
+    return source_validation_callback(dataset, eval_max_len, device)
 
 
 # ---------------------------------------------------------------------------
@@ -215,6 +205,7 @@ def run_pretrain_finetune(
     seed: int = 42,
 ):
     model_name, build_fn = MODEL_BUILDERS[model_key]
+    seed_everything(seed)
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -260,6 +251,7 @@ def run_pretrain_finetune(
             checkpoint_every=pretrain_steps // 2,
             device=device,
             seed=seed,
+            grad_cache=True,
         )
 
         pretrain_ckpt = run_dir / "checkpoints" / f"step_{pretrain_steps}.pt"
@@ -284,7 +276,7 @@ def run_pretrain_finetune(
     msmarco = MSMARCODataset(tokenizer, max_len=finetune_max_len)
     msmarco.load()
 
-    eval_fn = make_eval_fn(tokenizer, eval_max_len, device, do_locov1=True)
+    eval_fn = make_eval_fn(msmarco, finetune_max_len, device)
     run_dir = create_run_dir("exp6_finetune", model_key)
     config = {
         "experiment": "exp6_finetune",
@@ -310,10 +302,13 @@ def run_pretrain_finetune(
         eval_fn=eval_fn,
         device=device,
         seed=seed,
+        grad_cache=True,
     )
+    evaluate_selected_locov1(model, tokenizer, run_dir, finetune_result,
+                             max_len=eval_max_len, device=device)
 
     print(f"\n  {model_name} fine-tuning complete: "
-          f"best nDCG@10={finetune_result['best_metric']:.4f} "
+          f"source-dev MRR@10={finetune_result['best_metric']:.4f} "
           f"@ step {finetune_result['best_step']}")
 
     return {

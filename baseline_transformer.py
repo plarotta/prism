@@ -35,7 +35,10 @@ class TransformerEncoderLayer(nn.Module):
     def forward(self, x: Tensor, key_padding_mask: Optional[Tensor] = None) -> Tensor:
         # Pre-norm self-attention
         normed = self.norm1(x)
-        attn_out, _ = self.attn(normed, normed, normed, key_padding_mask=key_padding_mask)
+        attn_out, _ = self.attn(
+            normed, normed, normed, key_padding_mask=key_padding_mask,
+            need_weights=False,
+        )
         x = x + attn_out
         # Pre-norm MLP
         x = x + self.mlp(self.norm2(x))
@@ -59,14 +62,18 @@ class TransformerEncoder(nn.Module):
         mlp_ratio: float = 4.0,
         dropout: float = 0.1,
         pad_token_id: int = 0,
+        position_encoding: str = "learned",
     ):
         super().__init__()
         self.d = d
         self.d_e = d_e
         self.pad_token_id = pad_token_id
+        if position_encoding not in ("learned", "sinusoidal"):
+            raise ValueError("position_encoding must be 'learned' or 'sinusoidal'")
+        self.position_encoding = position_encoding
 
         self.token_emb = nn.Embedding(vocab_size, d, padding_idx=pad_token_id)
-        self.pos_emb = nn.Embedding(max_len, d)
+        self.pos_emb = nn.Embedding(max_len, d) if position_encoding == "learned" else None
         self.emb_dropout = nn.Dropout(dropout)
         self.emb_norm = nn.LayerNorm(d)
 
@@ -95,7 +102,19 @@ class TransformerEncoder(nn.Module):
         key_padding_mask = ~attention_mask.bool()
 
         positions = torch.arange(T, device=input_ids.device).unsqueeze(0).expand(B, -1)
-        x = self.token_emb(input_ids) + self.pos_emb(positions)
+        x = self.token_emb(input_ids)
+        if self.pos_emb is not None:
+            x = x + self.pos_emb(positions)
+        else:
+            # Deterministic positions for length-transfer experiments: no
+            # untrained absolute-position rows beyond the training length.
+            frequencies = torch.exp(torch.arange(0, self.d, 2, device=x.device).float()
+                                    * (-math.log(10000.0) / self.d))
+            angles = positions[0].float()[:, None] * frequencies[None, :]
+            positional = torch.zeros(T, self.d, device=x.device, dtype=x.dtype)
+            positional[:, 0::2] = angles.sin()
+            positional[:, 1::2] = angles.cos()[:, :self.d // 2]
+            x = x + positional
         x = self.emb_dropout(self.emb_norm(x))
 
         for layer in self.layers:

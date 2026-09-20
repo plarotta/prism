@@ -36,6 +36,7 @@ from transformers import AutoTokenizer
 
 from paper_log import create_run_dir
 from train_contrastive import train
+from experiment_protocol import seed_everything, source_validation_callback, evaluate_selected_locov1
 from data.msmarco import MSMARCODataset
 from data.loco_eval import evaluate_locov1
 
@@ -279,18 +280,8 @@ VARIANTS = {
 # Eval callback
 # ---------------------------------------------------------------------------
 
-def make_eval_fn(tokenizer, device):
-    def eval_fn(model_wrapper, step):
-        loco = evaluate_locov1(
-            model_wrapper, tokenizer, max_len=MAX_LEN,
-            batch_size=32, device=device,
-        )
-        return {
-            "locov1_avg_ndcg@10": loco["avg_ndcg@10"],
-            "locov1_per_task": loco["per_task"],
-            "locov1_eval_time_s": loco["eval_time_s"],
-        }
-    return eval_fn
+def make_eval_fn(dataset, device):
+    return source_validation_callback(dataset, MAX_LEN, device)
 
 
 # ---------------------------------------------------------------------------
@@ -317,6 +308,7 @@ def run_variant(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    seed_everything(seed)
     model = build_fn(MAX_LEN)
     total_params = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {total_params:,}")
@@ -325,7 +317,7 @@ def run_variant(
     dataset = MSMARCODataset(tokenizer, max_len=MAX_LEN)
     dataset.load()
 
-    eval_fn = make_eval_fn(tokenizer, device)
+    eval_fn = make_eval_fn(dataset, device)
     run_dir = create_run_dir("exp3_ablation", variant_key)
 
     config = {
@@ -353,9 +345,12 @@ def run_variant(
         eval_fn=eval_fn,
         device=device,
         seed=seed,
+        grad_cache=True,
     )
+    evaluate_selected_locov1(model, tokenizer, run_dir, result, max_len=MAX_LEN,
+                             device=device, batch_size=micro_batch)
 
-    print(f"\n  {variant_name} complete: best nDCG@10={result['best_metric']:.4f} "
+    print(f"\n  {variant_name} complete: source-dev MRR@10={result['best_metric']:.4f} "
           f"@ step {result['best_step']}")
     return result
 
@@ -404,7 +399,7 @@ def plot_ablation_results(results: dict):
                     xytext=(5, 0), textcoords="offset points",
                     ha="left", va="center", fontsize=9)
 
-    ax.set_xlabel("LoCoV1 nDCG@10")
+    ax.set_xlabel("MS MARCO source-dev proxy MRR@10")
     ax.set_title("Experiment 3: Component Ablation Study", fontsize=14, fontweight="bold")
     ax.legend()
     ax.grid(True, alpha=0.3, axis="x")

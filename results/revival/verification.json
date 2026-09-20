@@ -1,0 +1,48 @@
+{
+  "baseline_ref": "3efe85c",
+  "torch": "2.10.0+cpu",
+  "python": "3.12.3",
+  "device": "cpu",
+  "threads": 2,
+  "padding": {
+    "fixture": "identical weights; LayerNorm offsets sampled at std=0.1; 13 valid + 100 pad tokens",
+    "before": {
+      "min_cosine": 0.3708670735359192,
+      "max_abs_embedding_drift": 0.4180643856525421
+    },
+    "after": {
+      "min_cosine": 1.0000001192092896,
+      "max_abs_embedding_drift": 0.0
+    }
+  },
+  "learned_decay": {
+    "before": {
+      "all_logits_finite": false,
+      "decay_gradient": null
+    },
+    "after": {
+      "all_logits_finite": true,
+      "decay_gradient": [
+        3.385639138286933e-05,
+        1.2007994651794434,
+        0.4325355887413025
+      ]
+    }
+  },
+  "gradient_cache": {
+    "logical_batch": 32,
+    "micro_batch": 4,
+    "microbatches": 8,
+    "losses": {
+      "full_graph": 5.952488899230957,
+      "cached": 5.952488899230957
+    },
+    "max_abs_gradient_error": 9.5367431640625e-07,
+    "peak_live_autograd_saved_bytes_excluding_parameters": {
+      "full_graph": 25533000,
+      "cached": 2543816
+    },
+    "saved_tensor_reduction_factor": 10.037282570751973
+  },
+  "gpu_results": "not run; no CUDA device in this workspace"
+}

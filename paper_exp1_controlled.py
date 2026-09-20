@@ -19,6 +19,8 @@ Usage:
 """
 
 import argparse
+import random
+import numpy as np
 import json
 import time
 import traceback
@@ -29,12 +31,13 @@ from transformers import AutoTokenizer
 
 from paper_log import create_run_dir, finish_wandb
 from train_contrastive import train
+from experiment_protocol import evaluate_selected_locov1
 from data.msmarco import MSMARCODataset, evaluate_msmarco_dev
 from data.loco_eval import evaluate_locov1
 
 # Model builders
 from prism import prism_small, PRISMForEmbedding
-from paper_components import MeanPooling, NoInterference
+from paper_components import MeanPooling, NoInterference, LearnedDecayRecurrence
 from baseline_transformer import transformer_small, TransformerForEmbedding
 from mamba_bidir import build_mamba_bidir_small, MAMBA_AVAILABLE
 from linear_rnn import build_linear_rnn_small
@@ -47,9 +50,10 @@ VOCAB_SIZE = 30522
 # Model factories
 # ---------------------------------------------------------------------------
 
-def build_prism(max_len: int) -> PRISMForEmbedding:
+def build_prism(max_len: int, position_encoding="learned", learned_decay=False) -> PRISMForEmbedding:
     """PRISM-Simplified: all-slow decay, no interference, mean pooling."""
-    encoder = prism_small(vocab_size=VOCAB_SIZE, max_len=max_len)
+    encoder = prism_small(vocab_size=VOCAB_SIZE, max_len=max_len,
+                          position_encoding=position_encoding)
     # Replace interference with NoInterference
     for layer in encoder.layers:
         layer.interference_fwd = NoInterference(layer.d_c, layer.n_channels)
@@ -61,6 +65,14 @@ def build_prism(max_len: int) -> PRISMForEmbedding:
     for layer in encoder.layers:
         rec = layer.recurrence
         rec.lambdas.fill_(0.99)
+        if learned_decay:
+            new_rec = LearnedDecayRecurrence(rec.d_c, rec.n_channels, max_len, rec.bidirectional)
+            with torch.no_grad():
+                new_rec.lambda_logits.fill_(torch.logit(torch.tensor(0.99)).item())
+            new_rec.gates_fwd.load_state_dict(rec.gates_fwd.state_dict())
+            if rec.bidirectional:
+                new_rec.gates_bwd.load_state_dict(rec.gates_bwd.state_dict())
+            layer.recurrence = new_rec
     return PRISMForEmbedding(encoder)
 
 
@@ -85,7 +97,12 @@ MODEL_BUILDERS = {
     "transformer": ("Transformer", build_transformer),
     "mamba": ("Mamba-Bidir", build_mamba),
     "linear_rnn": ("Linear-RNN", build_linear_rnn),
+    "prism_no_pos": ("PRISM-NoPosition", lambda ml: build_prism(ml, "none")),
+    "prism_learned": ("PRISM-LearnedDecay", lambda ml: build_prism(ml, learned_decay=True)),
+    "transformer_sinusoidal": ("Transformer-Sinusoidal", lambda ml: TransformerForEmbedding(
+        transformer_small(vocab_size=VOCAB_SIZE, max_len=ml, position_encoding="sinusoidal"))),
 }
+CORE_MODELS = ["prism", "transformer", "mamba", "linear_rnn"]
 
 # ---------------------------------------------------------------------------
 # Sub-experiment configs
@@ -97,36 +114,36 @@ SUB_EXPERIMENTS = {
         "train_max_len": 128,
         "eval_max_len": 128,
         "eval_locov1": False,
-        "models": list(MODEL_BUILDERS.keys()),
+        "models": CORE_MODELS,
     },
     "1b": {
         "desc": "Medium-sequence comparison (512 tokens)",
         "train_max_len": 512,
         "eval_max_len": 512,
         "eval_locov1": False,
-        "models": list(MODEL_BUILDERS.keys()),
+        "models": CORE_MODELS,
     },
     "1c": {
         "desc": "Long-sequence comparison (2048 tokens)",
         "train_max_len": 2048,
         "eval_max_len": 2048,
         "eval_locov1": True,
-        "models": list(MODEL_BUILDERS.keys()),
+        "models": CORE_MODELS,
     },
     "1d": {
         "desc": "LoCoV1 zero-shot (train@2048, eval@2048)",
         "train_max_len": 2048,
         "eval_max_len": 2048,
         "eval_locov1": True,
-        "models": list(MODEL_BUILDERS.keys()),
+        "models": CORE_MODELS,
     },
     "1e": {
         "desc": "LoCoV1 long-context (train@2048, eval@8192)",
         "train_max_len": 2048,
         "eval_max_len": 8192,
         "eval_locov1": True,
-        # Transformer excluded — OOMs at 8K
-        "models": ["prism", "mamba", "linear_rnn"],
+        # Re-measure the optimized attention baseline; old OOMs are not a gate.
+        "models": CORE_MODELS,
     },
 }
 
@@ -135,12 +152,12 @@ SUB_EXPERIMENTS = {
 # Eval callback factory
 # ---------------------------------------------------------------------------
 
-def make_eval_fn(tokenizer, dataset, eval_max_len, device, do_locov1=True):
-    """Create an eval callback for use during training.
+def make_eval_fn(tokenizer, dataset, eval_max_len, device, do_locov1=False, batch_size=32):
+    """Select checkpoints using source validation only.
 
-    Always runs MS MARCO dev retrieval (MRR@10 / Recall) so short/medium
-    sub-experiments (1a/1b) have a quality metric. Adds LoCoV1 zero-shot
-    nDCG@10 for the long-doc sub-experiments (1c-1e).
+    The legacy do_locov1 argument is accepted for callers but cannot enable
+    target-benchmark evaluation during training. Transfer tests run once after
+    checkpoint selection in run_one().
     """
 
     def eval_fn(model_wrapper, step):
@@ -148,18 +165,10 @@ def make_eval_fn(tokenizer, dataset, eval_max_len, device, do_locov1=True):
 
         dev = evaluate_msmarco_dev(
             model_wrapper, dataset, max_len=eval_max_len,
-            batch_size=64, device=device,
+            batch_size=batch_size, device=device,
         )
         results.update(dev)
 
-        if do_locov1:
-            loco = evaluate_locov1(
-                model_wrapper, tokenizer, max_len=eval_max_len,
-                batch_size=32, device=device,
-            )
-            results["locov1_avg_ndcg@10"] = loco["avg_ndcg@10"]
-            results["locov1_per_task"] = loco["per_task"]
-            results["locov1_eval_time_s"] = loco["eval_time_s"]
         return results
 
     return eval_fn
@@ -183,6 +192,8 @@ def run_one(
     allow_mamba_fallback: bool = False,
     eval_early_stop_patience: int = 2,
     eval_early_stop_min_improvement: float = 0.01,
+    batch_mode: str = "cached",
+    hard_negatives: int = 0,
 ):
     """Train one model for one sub-experiment."""
     sub_exp = SUB_EXPERIMENTS[sub_exp_id]
@@ -206,6 +217,11 @@ def run_one(
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
+    # Seed before construction, not only after model weights are initialized.
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
     # Build model
     # Use eval_max_len for model's max_len so it can handle eval sequences
     model_max_len = max(sub_exp["train_max_len"], sub_exp["eval_max_len"])
@@ -215,13 +231,13 @@ def run_one(
 
     # Load data
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_NAME)
-    dataset = MSMARCODataset(tokenizer, max_len=sub_exp["train_max_len"])
+    dataset = MSMARCODataset(tokenizer, max_len=sub_exp["train_max_len"],
+                            n_hard_negatives=hard_negatives)
     dataset.load()
 
     # Eval callback
     eval_fn = make_eval_fn(
-        tokenizer, dataset, sub_exp["eval_max_len"], device,
-        do_locov1=sub_exp.get("eval_locov1", False),
+        tokenizer, dataset, sub_exp["train_max_len"], device, batch_size=micro_batch,
     )
 
     # Run dir
@@ -240,6 +256,9 @@ def run_one(
         },
         "train_max_len": sub_exp["train_max_len"],
         "eval_max_len": sub_exp["eval_max_len"],
+        "hard_negatives": hard_negatives,
+        "protocol_version": 2,
+        "transfer_selection": "source_validation_only",
     }
 
     # Train
@@ -259,9 +278,15 @@ def run_one(
         seed=seed,
         eval_early_stop_patience=eval_early_stop_patience,
         eval_early_stop_min_improvement=eval_early_stop_min_improvement,
+        grad_cache=batch_mode == "cached",
     )
 
-    print(f"\n  {model_name} complete: best nDCG@10={result['best_metric']:.4f} "
+    if sub_exp.get("eval_locov1", False):
+        evaluate_selected_locov1(model, tokenizer, run_dir, result,
+                                 max_len=sub_exp["eval_max_len"],
+                                 device=device, batch_size=micro_batch)
+
+    print(f"\n  {model_name} complete: best source-dev MRR@10={result['best_metric']:.4f} "
           f"@ step {result['best_step']}")
     return result
 
@@ -283,6 +308,9 @@ def main():
     parser.add_argument("--n-steps", type=int, default=50000)
     parser.add_argument("--micro-batch", type=int, default=16)
     parser.add_argument("--grad-accum", type=int, default=8)
+    parser.add_argument("--batch-mode", choices=["cached", "accumulate"], default="cached")
+    parser.add_argument("--hard-negatives", type=int, default=0,
+                        help="BM25 negatives per query; requires a Tevatron cache")
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--eval-every", type=int, default=5000)
     parser.add_argument("--device", type=str, default=None)
@@ -318,6 +346,7 @@ def main():
         parser.error("Specify --sub-exp, --all, or --smoke-test")
         return
 
+    failures = []
     for sub_exp_id in sub_exps:
         sub_exp = SUB_EXPERIMENTS[sub_exp_id]
         models = (
@@ -329,6 +358,7 @@ def main():
             if model_key not in MODEL_BUILDERS:
                 print(f"Unknown model: {model_key}. "
                       f"Choose from: {list(MODEL_BUILDERS.keys())}")
+                failures.append((sub_exp_id, model_key))
                 continue
             # Isolate failures: one model crashing must not silently abort the
             # rest of the sweep, and the traceback must be recorded.
@@ -343,11 +373,14 @@ def main():
                     eval_every=args.eval_every,
                     device=args.device,
                     seed=args.seed,
+                    batch_mode=args.batch_mode,
+                    hard_negatives=args.hard_negatives,
                     allow_mamba_fallback=args.allow_mamba_fallback,
                     eval_early_stop_patience=args.eval_early_stop_patience,
                     eval_early_stop_min_improvement=args.eval_early_stop_min_improvement,
                 )
             except Exception:
+                failures.append((sub_exp_id, model_key))
                 finish_wandb()  # close the crashed run's W&B session, if any
                 tb = traceback.format_exc()
                 err_dir = Path("results/paper") / f"exp1_{sub_exp_id}"
@@ -358,6 +391,8 @@ def main():
                       f"traceback saved to {err_path}\n{tb}")
                 continue
 
+    if failures:
+        raise SystemExit(f"{len(failures)} runs failed: {failures}")
     print("\n=== All runs complete ===")
 
 

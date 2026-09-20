@@ -1,0 +1,267 @@
+{
+  "description": "Synthetic binding diagnostic; identical positive/negative token bags",
+  "torch": "2.10.0+cpu",
+  "device": "cpu",
+  "threads": 2,
+  "training_gap_range": [
+    1,
+    8
+  ],
+  "learning_rate": 0.001,
+  "batch_size": 32,
+  "bag_of_words_pair_accuracy": 0.5,
+  "runs": [
+    {
+      "model": "prism",
+      "seed": 0,
+      "steps": 400,
+      "parameters": 94080,
+      "train_seconds": 12.999856379999983,
+      "final_50_step_loss": 1.5006365835666657,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.517578125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.0005219706945354119
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.5078125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0003805928863584995
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.45703125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.0003917423091479577
+        }
+      }
+    },
+    {
+      "model": "prism_no_pos",
+      "seed": 0,
+      "steps": 400,
+      "parameters": 44928,
+      "train_seconds": 12.960697648000064,
+      "final_50_step_loss": 1.5047365367412566,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.5,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0008303278082166798
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.4765625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.0007000112782407086
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.515625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.00019676026477100095
+        }
+      }
+    },
+    {
+      "model": "transformer_sinusoidal",
+      "seed": 0,
+      "steps": 400,
+      "parameters": 46752,
+      "train_seconds": 8.849849594000034,
+      "final_50_step_loss": 1.3790780639648437,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.470703125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.0011158157358295284
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.54296875,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0005997202288199333
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.5068359375,
+          "tie_fraction": 0.001953125,
+          "mean_cosine_margin": 5.489116938406369e-05
+        }
+      }
+    },
+    {
+      "model": "prism",
+      "seed": 1,
+      "steps": 400,
+      "parameters": 94080,
+      "train_seconds": 12.558175154999958,
+      "final_50_step_loss": 1.5558011758327484,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.517578125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0005164079593669157
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.498046875,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -3.79031998818391e-05
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.486328125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -4.374327909317799e-05
+        }
+      }
+    },
+    {
+      "model": "prism_no_pos",
+      "seed": 1,
+      "steps": 400,
+      "parameters": 44928,
+      "train_seconds": 12.074161768999943,
+      "final_50_step_loss": 1.5267637586593628,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.529296875,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0009248845526599325
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.51171875,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 5.489933755598031e-05
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.517578125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0002349124470129027
+        }
+      }
+    },
+    {
+      "model": "transformer_sinusoidal",
+      "seed": 1,
+      "steps": 400,
+      "parameters": 46752,
+      "train_seconds": 9.467723514999989,
+      "final_50_step_loss": 1.4141532135009767,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.52734375,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0006021226236043731
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.494140625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.00036332011768536177
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.4765625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -7.880152566031029e-06
+        }
+      }
+    },
+    {
+      "model": "prism",
+      "seed": 2,
+      "steps": 400,
+      "parameters": 94080,
+      "train_seconds": 13.240213523999955,
+      "final_50_step_loss": 1.5908124256134033,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.50390625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.0002288241194037255
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.466796875,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.0006831555292592384
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.48828125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 3.334220855322201e-05
+        }
+      }
+    },
+    {
+      "model": "prism_no_pos",
+      "seed": 2,
+      "steps": 400,
+      "parameters": 44928,
+      "train_seconds": 11.962427544999969,
+      "final_50_step_loss": 1.5651561689376832,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.537109375,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.000739821760362247
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.515625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.000372780790712568
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.486328125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.00019547010924725328
+        }
+      }
+    },
+    {
+      "model": "transformer_sinusoidal",
+      "seed": 2,
+      "steps": 400,
+      "parameters": 46752,
+      "train_seconds": 9.290290952999953,
+      "final_50_step_loss": 1.4607501792907716,
+      "evaluation": {
+        "8": {
+          "seq_len": 28,
+          "pair_accuracy": 0.484375,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -0.0009200502609019168
+        },
+        "32": {
+          "seq_len": 100,
+          "pair_accuracy": 0.55078125,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": 0.00032020312664826633
+        },
+        "128": {
+          "seq_len": 388,
+          "pair_accuracy": 0.478515625,
+          "tie_fraction": 0.0,
+          "mean_cosine_margin": -5.056242275713885e-05
+        }
+      }
+    }
+  ]
+}

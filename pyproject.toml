@@ -1,7 +1,7 @@
 [project]
 name = "prism"
 version = "0.1.0"
-description = "Add your description here"
+description = "Bidirectional recurrent text encoders with controlled retrieval evaluation"
 requires-python = ">=3.10"
 dependencies = [
     "datasets>=3.0.0",

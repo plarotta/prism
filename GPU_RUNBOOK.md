@@ -1,5 +1,13 @@
 # PRISM Paper Experiment Suite — GPU Runbook
 
+## Revival protocol
+
+Start with `REVIVAL_REPORT.md` for corrected commands and interpretation. The
+current Exp 1 default is `--batch-mode cached`: all accumulated microbatches
+participate in one contrastive loss. `--hard-negatives N` enables BM25 negatives.
+Checkpoint selection uses the source-dev proxy; LoCoV1 runs after selection.
+Historical GPU speed/OOM numbers must be remeasured against optimized attention.
+
 _Last updated: 2026-06-21_
 
 How to set up and run the Experiment 1 controlled comparison (and friends) on a

@@ -2,8 +2,8 @@
 Unified contrastive training loop for paper experiments.
 
 Model-agnostic: works with any model that implements:
-  - .forward(query_ids, query_mask, pos_ids, pos_mask) -> {"loss": Tensor}
-  - .encode(input_ids, attention_mask) -> Tensor  (for eval)
+  - .encode(input_ids, attention_mask) -> normalized embedding Tensor
+  - .temperature -> positive contrastive temperature
 
 Handles: AdamW + cosine schedule with warmup, gradient accumulation,
 gradient clipping, periodic eval via callback, checkpointing, and
@@ -20,6 +20,7 @@ import time
 
 import numpy as np
 import torch
+from contrastive_batch import cached_contrastive_backward, contrastive_loss
 
 from paper_log import (
     save_config,
@@ -94,11 +95,13 @@ def train(
     early_stop_min_improvement: float = 0.05,
     eval_early_stop_patience: int = 2,
     eval_early_stop_min_improvement: float = 0.01,
+    grad_cache: bool = False,
+    selection_metric: str = "msmarco_dev_mrr@10",
 ):
     """Train a contrastive embedding model with structured logging.
 
     Args:
-        model_wrapper: model with .forward() and .encode()
+        model_wrapper: model with .encode() and .temperature
         dataset: object with .sample_batch(batch_size) -> dict of tensors
         run_dir: Path to results directory for this run
         config: dict of experiment config (saved to config.json)
@@ -115,6 +118,9 @@ def train(
         eval_fn: callable(model, step) -> dict, or None
         device: torch device string (auto-detected if None)
         seed: random seed
+        grad_cache: use all microbatches as one contrastive candidate pool
+        selection_metric: validation metric used for checkpoint selection;
+            never use a held-out transfer benchmark for this purpose
         compile: use torch.compile (CUDA only)
         early_stop_patience: stop if loss doesn't improve by
             early_stop_min_improvement over this many steps.
@@ -127,6 +133,9 @@ def train(
     """
     if device is None:
         device = _select_device()
+    device_type = torch.device(device).type
+    if min(n_steps, micro_batch, grad_accum, log_every, eval_every, checkpoint_every) < 1:
+        raise ValueError("step counts and batch sizes must be positive")
 
     # Seed
     random.seed(seed)
@@ -141,6 +150,9 @@ def train(
         "micro_batch": micro_batch,
         "grad_accum": grad_accum,
         "effective_batch": micro_batch * grad_accum,
+        "contrastive_batch": micro_batch * grad_accum if grad_cache else micro_batch,
+        "batch_mode": "cached" if grad_cache else "accumulate",
+        "selection_metric": selection_metric,
         "lr": lr,
         "warmup_fraction": warmup_fraction,
         "weight_decay": weight_decay,
@@ -165,7 +177,7 @@ def train(
     trainable_params = sum(p.numel() for p in model_wrapper.parameters() if p.requires_grad)
     print(f"  Parameters: {total_params:,} total, {trainable_params:,} trainable")
 
-    if compile and device == "cuda":
+    if compile and device_type == "cuda":
         print(f"  Compiling model with torch.compile...")
         model_wrapper = torch.compile(model_wrapper)
 
@@ -197,7 +209,7 @@ def train(
               f"evals, min_improvement={eval_early_stop_min_improvement:.1%}")
 
     # AMP setup (bf16 on CUDA, no scaler needed for bf16)
-    use_amp = (device == "cuda" and torch.cuda.is_bf16_supported())
+    use_amp = (device_type == "cuda" and torch.cuda.is_bf16_supported())
     amp_dtype = torch.bfloat16 if use_amp else torch.float32
     if use_amp:
         print(f"  Using automatic mixed precision (bf16)")
@@ -209,18 +221,32 @@ def train(
         optimizer.zero_grad()
         step_loss = 0.0
 
-        for _ in range(grad_accum):
+        if grad_cache:
+            batches = [dataset.sample_batch(micro_batch) for _ in range(grad_accum)]
+            step_loss = cached_contrastive_backward(model_wrapper, batches, use_amp=use_amp)
+
+        for _ in range(0 if grad_cache else grad_accum):
             batch = dataset.sample_batch(micro_batch)
             batch = {k: v.to(device) for k, v in batch.items()}
-            with torch.autocast(device, dtype=amp_dtype, enabled=use_amp):
-                result = model_wrapper(
-                    batch["query_ids"], batch["query_mask"],
-                    batch["pos_ids"], batch["pos_mask"],
-                )
-                loss = result["loss"] / grad_accum
+            with torch.autocast(device_type, dtype=amp_dtype, enabled=use_amp):
+                q = model_wrapper.encode(batch["query_ids"], batch["query_mask"])
+                p = model_wrapper.encode(batch["pos_ids"], batch["pos_mask"])
+                negatives = None
+                if "neg_ids" in batch:
+                    B, N, T = batch["neg_ids"].shape
+                    negatives = model_wrapper.encode(
+                        batch["neg_ids"].reshape(B * N, T),
+                        batch["neg_mask"].reshape(B * N, T),
+                    ).reshape(B, N, -1)
+                loss = contrastive_loss(
+                    q, p, model_wrapper.temperature, negatives,
+                    batch.get("positive_groups"), batch.get("query_groups"),
+                ) / grad_accum
             loss.backward()
             step_loss += loss.detach()
 
+        if not torch.isfinite(step_loss):
+            raise FloatingPointError(f"non-finite contrastive loss at step {step}")
         grad_norm = torch.nn.utils.clip_grad_norm_(
             model_wrapper.parameters(), grad_clip,
         )
@@ -260,14 +286,11 @@ def train(
             eval_results = eval_fn(model_wrapper, step)
             save_eval_results(run_dir, step, "eval", eval_results)
 
-            # Prefer long-doc nDCG@10 when available, else MS MARCO dev MRR@10.
-            metric_val = eval_results.get(
-                "locov1_avg_ndcg@10",
-                eval_results.get(
-                    "avg_ndcg@10",
-                    eval_results.get("msmarco_dev_mrr@10", 0),
-                ),
-            )
+            if selection_metric not in eval_results:
+                raise ValueError(f"validation callback must return {selection_metric!r}")
+            metric_val = float(eval_results[selection_metric])
+            if not math.isfinite(metric_val):
+                raise ValueError("validation metric must be finite")
             if metric_val > best_metric:
                 best_metric = metric_val
                 best_step = step
@@ -334,10 +357,12 @@ def train(
     total_time = time.perf_counter() - t0
     steps_completed = step if stopped_early else n_steps
     print(f"  Training complete in {total_time:.0f}s ({steps_completed} steps)")
+    save_checkpoint(run_dir, model_wrapper, optimizer, steps_completed)
 
     final = {
         "best_step": best_step,
         "best_metric": best_metric,
+        "selection_metric": selection_metric,
         "final_loss": round(float(np.mean(all_losses[-100:])), 5),
         "total_train_time_s": round(total_time, 1),
         "total_params": total_params,

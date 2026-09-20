@@ -24,6 +24,7 @@ from transformers import AutoTokenizer
 
 from paper_log import create_run_dir, capture_hardware_info
 from train_contrastive import train
+from experiment_protocol import seed_everything, source_validation_callback, evaluate_selected_locov1
 from data.msmarco import MSMARCODataset
 from data.loco_eval import evaluate_locov1
 
@@ -77,18 +78,8 @@ MODEL_BUILDERS = {
 # Eval callback
 # ---------------------------------------------------------------------------
 
-def make_eval_fn(tokenizer, eval_max_len, device):
-    def eval_fn(model_wrapper, step):
-        loco = evaluate_locov1(
-            model_wrapper, tokenizer, max_len=eval_max_len,
-            batch_size=16, device=device,  # smaller batch for larger models
-        )
-        return {
-            "locov1_avg_ndcg@10": loco["avg_ndcg@10"],
-            "locov1_per_task": loco["per_task"],
-            "locov1_eval_time_s": loco["eval_time_s"],
-        }
-    return eval_fn
+def make_eval_fn(dataset, eval_max_len, device):
+    return source_validation_callback(dataset, eval_max_len, device, batch_size=16)
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +109,7 @@ def run_one(
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model_max_len = max(train_max_len, eval_max_len)
+    seed_everything(seed)
     model = build_fn(model_max_len)
     total_params = sum(p.numel() for p in model.parameters())
     print(f"  Parameters: {total_params:,}")
@@ -126,7 +118,7 @@ def run_one(
     dataset = MSMARCODataset(tokenizer, max_len=train_max_len)
     dataset.load()
 
-    eval_fn = make_eval_fn(tokenizer, eval_max_len, device)
+    eval_fn = make_eval_fn(dataset, train_max_len, device)
     run_dir = create_run_dir("exp7_scaleup", model_key)
 
     config = {
@@ -156,9 +148,12 @@ def run_one(
         eval_fn=eval_fn,
         device=device,
         seed=seed,
+        grad_cache=True,
     )
+    evaluate_selected_locov1(model, tokenizer, run_dir, result, max_len=eval_max_len,
+                             device=device, batch_size=micro_batch)
 
-    print(f"\n  {model_name} complete: best nDCG@10={result['best_metric']:.4f} "
+    print(f"\n  {model_name} complete: source-dev MRR@10={result['best_metric']:.4f} "
           f"@ step {result['best_step']}")
     return result
 

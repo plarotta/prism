@@ -31,39 +31,14 @@ from paper_components import MeanPooling, NoInterference
 from baseline_transformer import transformer_small, TransformerForEmbedding
 from mamba_bidir import build_mamba_bidir_small
 from linear_rnn import build_linear_rnn_small
+from experiment_protocol import load_encoder_for_eval
 
 TOKENIZER_NAME = "bert-base-uncased"
 VOCAB_SIZE = 30522
 RESULTS_DIR = Path("results") / "paper" / "exp5"
 
-MODEL_BUILDERS = {
-    "prism": ("PRISM-Simplified", lambda ml: _build_prism(ml)),
-    "transformer": ("Transformer", lambda ml: TransformerForEmbedding(
-        transformer_small(vocab_size=VOCAB_SIZE, max_len=ml)
-    )),
-    "mamba": ("Mamba-Bidir", lambda ml: build_mamba_bidir_small(VOCAB_SIZE, ml)),
-    "linear_rnn": ("Linear-RNN", lambda ml: build_linear_rnn_small(VOCAB_SIZE, ml)),
-}
+from paper_exp1_controlled import MODEL_BUILDERS
 
-
-def _build_prism(max_len):
-    encoder = prism_small(vocab_size=VOCAB_SIZE, max_len=max_len)
-    for layer in encoder.layers:
-        layer.interference_fwd = NoInterference(layer.d_c, layer.n_channels)
-        if layer.bidirectional:
-            layer.interference_bwd = NoInterference(layer.d_c, layer.n_channels)
-    encoder.pooling = MeanPooling(encoder.d, encoder.d_e)
-    for layer in encoder.layers:
-        layer.recurrence.lambdas.fill_(0.99)
-    return PRISMForEmbedding(encoder)
-
-
-def load_checkpoint_into_model(model, checkpoint_path, device="cpu"):
-    """Load model weights from a training checkpoint."""
-    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    state_dict = ckpt.get("model_state_dict", ckpt)
-    model.load_state_dict(state_dict, strict=False)
-    return model
 
 
 def find_best_checkpoint(run_dir: Path) -> Path | None:
@@ -103,11 +78,7 @@ def eval_model_beir(
     model_name = MODEL_BUILDERS[model_key][0]
     print(f"\n  {model_name} @ max_len={max_len}")
 
-    build_fn = MODEL_BUILDERS[model_key][1]
-    model = build_fn(max_len)
-    load_checkpoint_into_model(model, checkpoint_path, device)
-    model = model.to(device)
-    model.eval()
+    model = load_encoder_for_eval(model_key, checkpoint_path, max_len, device)
 
     beir_results = evaluate_beir(
         model, tokenizer, max_len=max_len,
