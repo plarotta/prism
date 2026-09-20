@@ -190,7 +190,7 @@ def _scan(x: Tensor, decays: Tensor, reverse: bool) -> Tensor:
     if reverse:
         x = x.flip(1)
 
-    if x.is_cuda and TRITON_AVAILABLE:
+    if x.is_cuda and TRITON_AVAILABLE and x.dtype != torch.float64:
         out = _triton_forward(x, decays)
     else:
         out = _ref_forward(x, decays)
@@ -203,7 +203,7 @@ def _scan(x: Tensor, decays: Tensor, reverse: bool) -> Tensor:
 class _FusedDecayScan(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x: Tensor, decays: Tensor, reverse: bool) -> Tensor:
-        ctx.decays = decays
+        ctx.save_for_backward(decays)
         ctx.reverse = reverse
         return _scan(x, decays, reverse)
 
@@ -211,7 +211,8 @@ class _FusedDecayScan(torch.autograd.Function):
     def backward(ctx, grad_out: Tensor):
         # Gradient of a linear recurrence is the same recurrence in reverse time;
         # decays are fixed buffers, so no gradient flows to them.
-        grad_x = _scan(grad_out.contiguous(), ctx.decays, not ctx.reverse)
+        (decays,) = ctx.saved_tensors
+        grad_x = _scan(grad_out.contiguous(), decays, not ctx.reverse)
         return grad_x, None, None
 
 
@@ -232,4 +233,6 @@ def fused_decay_scan(x: Tensor, decays: Tensor, reverse: bool = False) -> Tensor
         raise ValueError(
             f"decays must be (C,) with C={x.shape[2]}; got shape {tuple(decays.shape)}"
         )
+    if decays.requires_grad:
+        raise ValueError("fused_decay_scan accepts fixed decays only; use a differentiable scan for learned decays")
     return _FusedDecayScan.apply(x, decays, reverse)

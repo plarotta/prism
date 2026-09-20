@@ -162,7 +162,10 @@ class StratifiedProjection(nn.Module):
         Returns:
             list of C tensors, each (B, T, d_c)
         """
-        return [proj(x) for proj in self.projections]
+        # One GEMM instead of C small launches; retain the original parameters
+        # and state-dict keys so existing checkpoints still load strictly.
+        weight = torch.cat([proj.weight for proj in self.projections], dim=0)
+        return list(F.linear(x, weight).split(self.d_c, dim=-1))
 
 
 # ---------------------------------------------------------------------------
@@ -227,26 +230,27 @@ class StratifiedRecurrence(nn.Module):
         Returns:
             list of C hidden-state sequences, each (B, T, d_c)
         """
-        # Extract all lambda values once (avoid per-channel GPU-CPU sync)
-        lam_values = self.lambdas.detach().tolist()
-
-        # Apply per-channel gating
-        gated = []
-        for z_c, gate_c in zip(channels, gates):
-            g_t = torch.sigmoid(gate_c(z_c))  # (B, T, d_c)
-            gated.append(g_t * z_c)
+        # Group channel-local gate projections into a single batched matmul.
+        z = torch.stack(channels, dim=0)  # C, B, T, D
+        C, B, T, D = z.shape
+        weights = torch.stack([gate.weight for gate in gates])
+        biases = torch.stack([gate.bias for gate in gates])[:, None, :]
+        logits = torch.bmm(z.reshape(C, B * T, D), weights.transpose(1, 2))
+        gated = (torch.sigmoid(logits + biases).reshape_as(z) * z).unbind(0)
 
         # Fused path: one Triton kernel handles all channels (any decays) in a
         # single launch. Used on CUDA when the kernel is available.
         if (
             self.use_fused_scan
-            and fused_scan_available()
-            and gated[0].is_cuda
+            and fused_decay_scan is not None
         ):
             x = torch.stack(gated, dim=2)               # (B, T, C, d_c)
             h = fused_decay_scan(x, self.lambdas)       # (B, T, C, d_c)
             return [h[:, :, c] for c in range(len(gated))]
 
+        # Legacy path remains available for numerical/performance comparisons.
+        # Do not synchronize CUDA decays to Python on the default scan path.
+        lam_values = self.lambdas.detach().tolist()
         # Fast path: batch all channels into one scan when all decays are equal
         all_same = all(abs(lam_values[i] - lam_values[0]) < 1e-8
                        for i in range(1, len(lam_values)))
@@ -748,6 +752,10 @@ class PRISMLayer(nn.Module):
         """
         residual = x
         x = self.norm(x)
+        # A trained LayerNorm bias makes zero-padded inputs nonzero. Mask AFTER
+        # normalization so padding cannot enter either recurrence direction.
+        if mask is not None:
+            x = x.masked_fill(~mask.unsqueeze(-1).bool(), 0)
 
         # Stage 1
         channels = self.projection(x)  # list of C × (B, T, d_c)
@@ -757,7 +765,14 @@ class PRISMLayer(nn.Module):
 
         # Capture the global summary state from slowest channel
         # (last position of forward, first position of backward)
-        fwd_global = fwd_h[-1][:, -1, :]  # (B, d_c) — slowest channel, last position
+        if mask is None:
+            fwd_global = fwd_h[-1][:, -1, :]
+        else:
+            positions = torch.arange(x.shape[1], device=x.device).expand_as(mask)
+            last_valid = positions.masked_fill(~mask.bool(), -1).amax(dim=1)
+            fwd_global = fwd_h[-1][torch.arange(x.shape[0], device=x.device),
+                                    last_valid.clamp_min(0)]
+            fwd_global = fwd_global.masked_fill((last_valid < 0).unsqueeze(-1), 0)
 
         # Stage 3
         fwd_mixed = self.interference_fwd(fwd_h)
@@ -808,17 +823,21 @@ class PRISMEncoder(nn.Module):
         dropout: float = 0.1,
         cov_rank: int = 32,
         pad_token_id: int = 0,
+        position_encoding: Literal["learned", "none"] = "learned",
     ):
         super().__init__()
         self.d = d
         self.d_e = d_e
         self.pad_token_id = pad_token_id
         self.n_channels = n_channels
+        if position_encoding not in ("learned", "none"):
+            raise ValueError("position_encoding must be 'learned' or 'none'")
+        self.position_encoding = position_encoding
         d_c = d // n_channels
 
         # Token + positional embedding
         self.token_emb = nn.Embedding(vocab_size, d, padding_idx=pad_token_id)
-        self.pos_emb = nn.Embedding(max_len, d)
+        self.pos_emb = nn.Embedding(max_len, d) if position_encoding == "learned" else None
 
         self.emb_dropout = nn.Dropout(dropout)
         self.emb_norm = nn.LayerNorm(d)
@@ -843,7 +862,10 @@ class PRISMEncoder(nn.Module):
     def _init_weights(self):
         """Standard initialisation."""
         nn.init.normal_(self.token_emb.weight, std=0.02)
-        nn.init.normal_(self.pos_emb.weight, std=0.02)
+        if self.pos_emb is not None:
+            nn.init.normal_(self.pos_emb.weight, std=0.02)
+        with torch.no_grad():
+            self.token_emb.weight[self.pad_token_id].zero_()
         for module in self.modules():
             if isinstance(module, nn.Linear) and module.bias is not None:
                 if module not in [g for layer in self.layers
@@ -874,8 +896,10 @@ class PRISMEncoder(nn.Module):
         mask_bool = attention_mask.bool()
 
         # Token + position embeddings
-        positions = torch.arange(T, device=input_ids.device).unsqueeze(0).expand(B, -1)
-        x = self.token_emb(input_ids) + self.pos_emb(positions)
+        x = self.token_emb(input_ids)
+        if self.pos_emb is not None:
+            positions = torch.arange(T, device=input_ids.device).unsqueeze(0).expand(B, -1)
+            x = x + self.pos_emb(positions)
         x = self.emb_dropout(self.emb_norm(x))
 
         # Zero out padding positions
@@ -887,7 +911,7 @@ class PRISMEncoder(nn.Module):
             x, fwd_global = layer(x, mask_bool)
             x = x * mask_bool.unsqueeze(-1).float()
 
-        x = self.final_norm(x)
+        x = self.final_norm(x).masked_fill(~mask_bool.unsqueeze(-1), 0)
 
         # Pooling
         query = self.query_proj(fwd_global)  # (B, d)

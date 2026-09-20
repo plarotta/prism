@@ -15,7 +15,8 @@ dependency on the archived Phase 1-6 code.
 import torch
 import torch.nn as nn
 
-from prism import StratifiedRecurrence, _fast_fixed_decay_scan
+from prism import StratifiedRecurrence
+from prism_scan_kernel import _ref_forward
 
 
 class NoInterference(nn.Module):
@@ -53,24 +54,22 @@ class LearnedDecayRecurrence(StratifiedRecurrence):
         super().__init__(d_c, n_channels, max_len, bidirectional)
         # Override: make lambdas a learned parameter instead of a buffer,
         # initialized at the same geometric values.
-        init_lambdas = self.lambdas.clone()
+        init_lambdas = self.lambdas.clone().clamp(1e-4, 1 - 1e-4)
         self.lambdas = None  # remove buffer
         # Store as logit for unconstrained optimization; sigmoid maps to (0,1).
-        self.lambda_logits = nn.Parameter(
-            torch.log(init_lambdas / (1.0 - init_lambdas + 1e-8))
-        )
+        self.lambda_logits = nn.Parameter(torch.logit(init_lambdas))
 
     @property
     def _lambdas(self):
         return torch.sigmoid(self.lambda_logits)
 
     def _run_direction(self, channels, gates):
-        hiddens = []
         lambdas = self._lambdas
-        for c, (z_c, gate_c) in enumerate(zip(channels, gates)):
+        gated = []
+        for z_c, gate_c in zip(channels, gates):
             g_t = torch.sigmoid(gate_c(z_c))
-            gated_input = g_t * z_c
-            lam = lambdas[c].item()
-            h_c = _fast_fixed_decay_scan(lam, gated_input)
-            hiddens.append(h_c)
-        return hiddens
+            gated.append(g_t * z_c)
+        # Tensor-valued decays preserve d(loss)/d(lambda). The fixed-decay
+        # custom backward deliberately cannot be used for this ablation.
+        h = _ref_forward(torch.stack(gated, dim=2), lambdas)
+        return list(h.unbind(2))

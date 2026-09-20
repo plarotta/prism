@@ -33,6 +33,7 @@ from paper_components import MeanPooling, NoInterference
 from baseline_transformer import transformer_small, TransformerForEmbedding
 from mamba_bidir import build_mamba_bidir_small
 from linear_rnn import build_linear_rnn_small
+from mamba_bidir import MAMBA_AVAILABLE
 
 VOCAB_SIZE = 30522
 SEQ_LENGTHS = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
@@ -55,12 +56,7 @@ def build_transformer(max_len):
     return TransformerForEmbedding(transformer_small(vocab_size=VOCAB_SIZE, max_len=max_len))
 
 
-MODEL_BUILDERS = {
-    "prism": ("PRISM-Simplified", build_prism),
-    "transformer": ("Transformer", build_transformer),
-    "mamba": ("Mamba-Bidir", lambda ml: build_mamba_bidir_small(VOCAB_SIZE, ml)),
-    "linear_rnn": ("Linear-RNN", lambda ml: build_linear_rnn_small(VOCAB_SIZE, ml)),
-}
+from paper_exp1_controlled import MODEL_BUILDERS
 
 
 # ---------------------------------------------------------------------------
@@ -166,10 +162,7 @@ def _is_oom(e: Exception) -> bool:
     """True for CUDA OOM, including the allocator-assert form some virtualized
     GPUs raise instead of a clean 'out of memory' (CUDACachingAllocator assert)."""
     s = str(e).lower()
-    return any(k in s for k in (
-        "out of memory", "cudacachingallocator", "cuda error",
-        "cublas", "alloc",
-    ))
+    return isinstance(e, torch.cuda.OutOfMemoryError) or "out of memory" in s
 
 
 def _save_partial(results: dict, out_path):
@@ -199,6 +192,11 @@ def run_benchmarks(
     results = {}
 
     for model_key in model_keys:
+        if model_key == "mamba" and not MAMBA_AVAILABLE:
+            results[model_key] = {"name": "Mamba-Bidir", "skipped": "mamba_ssm unavailable", "lengths": {}}
+            print("Skipping Mamba: mamba_ssm is unavailable; no substitute baseline is measured")
+            _save_partial(results, out_path)
+            continue
         model_name, build_fn = MODEL_BUILDERS[model_key]
         results[model_key] = {"name": model_name, "lengths": {}}
 
@@ -246,7 +244,8 @@ def run_benchmarks(
                             raise
 
                     try:
-                        mem = measure_peak_memory(model, seq_len, 16, device)
+                        mem = measure_peak_memory(model, seq_len, train_bs, device)
+                        mem["batch_size"] = train_bs
                         length_results["memory"] = mem
                         print(f"    Peak memory: {mem['fwd_bwd_mb']} MB")
                     except RuntimeError as e:

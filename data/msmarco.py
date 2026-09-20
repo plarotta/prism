@@ -20,6 +20,7 @@ Preparation (pre-tokenize, ~10 min first time):
 """
 
 import json
+import hashlib
 import random
 import time
 from pathlib import Path
@@ -41,12 +42,14 @@ class MSMARCODataset:
         self,
         tokenizer,
         max_len: int = 512,
-        n_hard_negatives: int = 7,
+        n_hard_negatives: int = 0,
         cache_dir: Path = CACHE_DIR,
     ):
         self.tokenizer = tokenizer
         self.max_len = max_len
         self.n_hard_negatives = n_hard_negatives
+        if n_hard_negatives < 0:
+            raise ValueError("n_hard_negatives must be nonnegative")
         self.cache_dir = cache_dir / f"maxlen_{max_len}"
 
         # Populated by load()
@@ -61,11 +64,29 @@ class MSMARCODataset:
     def load(self):
         """Load dataset, using cache if available."""
         if self._try_load_cache():
+            self._select_train_queries()
             return
 
         print("[msmarco] Loading from HuggingFace (first time — will cache)...")
         self._load_from_hf()
         self._save_cache()
+        self._select_train_queries()
+
+    def _select_train_queries(self):
+        self._train_qids = [
+            qid for qid in self.train_qrels
+            if qid in self.train_queries
+            and any(pid in self.passages for pid in self.train_qrels[qid])
+        ]
+        if self.n_hard_negatives:
+            self.train_negatives = {
+                qid: [pid for pid in self.train_negatives.get(qid, [])
+                      if pid in self.passages and pid not in self.train_qrels[qid]]
+                for qid in self._train_qids
+            }
+            self._train_qids = [qid for qid in self._train_qids if self.train_negatives[qid]]
+        if not self._train_qids:
+            raise ValueError("No eligible training queries; hard negatives require a Tevatron cache")
 
     def _try_load_cache(self) -> bool:
         """Try to load pre-tokenized data from cache."""
@@ -81,20 +102,25 @@ class MSMARCODataset:
         self.dev_queries = _load_id_to_tokens(self.cache_dir / "dev_queries.jsonl")
         self.dev_qrels = _load_id_to_list(self.cache_dir / "dev_qrels.jsonl")
 
-        # Load ONLY positive passages (referenced in qrels). Training uses
-        # in-batch negatives only and the dev eval ranks against dev positives,
-        # so the ~30 BM25 hard negatives/query stored on disk are never read —
-        # loading them would cost ~15x the RAM for nothing. See
-        # PAPER_EXPERIMENT_PLAN.md (Implementation Status & Known Deviations).
+        # Load positive passages plus only the requested number of hard
+        # negatives per training query. Avoid materializing all 30 negatives.
         needed_pids = set()
         for pids in self.train_qrels.values():
             needed_pids.update(pids)
         for pids in self.dev_qrels.values():
             needed_pids.update(pids)
+        self.train_negatives = {}
+        neg_path = self.cache_dir / "train_negatives.jsonl"
+        if self.n_hard_negatives and neg_path.exists():
+            all_negatives = _load_id_to_list(neg_path)
+            for qid, pids in all_negatives.items():
+                positives = set(self.train_qrels.get(qid, []))
+                selected = [pid for pid in pids if pid not in positives][:self.n_hard_negatives]
+                self.train_negatives[qid] = selected
+                needed_pids.update(selected)
         self.passages = _load_id_to_tokens_filtered(
             self.cache_dir / "passages.jsonl", needed_pids,
         )
-        self.train_negatives = {}  # hard negatives unused by sample_batch
 
         self._train_qids = [
             qid for qid in self.train_qrels
@@ -303,7 +329,7 @@ class MSMARCODataset:
     # ----- Batch sampling -----
 
     def sample_batch(self, batch_size: int) -> dict:
-        """Sample a training batch with in-batch negatives.
+        """Sample positives and optional per-query BM25 hard negatives.
 
         Returns dict of tensors:
             query_ids:  (B, max_q_len)
@@ -311,29 +337,52 @@ class MSMARCODataset:
             pos_ids:    (B, max_p_len)
             pos_mask:   (B, max_p_len)
         """
-        qids = random.choices(self._train_qids, k=batch_size)
+        qids = random.sample(self._train_qids, batch_size) if batch_size <= len(self._train_qids) \
+            else random.choices(self._train_qids, k=batch_size)
 
         query_tokens = []
         pos_tokens = []
+        pos_pids = []
+        neg_tokens = []
 
         for qid in qids:
             query_tokens.append(self.train_queries[qid])
-            pos_pid = random.choice(self.train_qrels[qid])
+            pos_pid = random.choice([pid for pid in self.train_qrels[qid] if pid in self.passages])
+            pos_pids.append(pos_pid)
             pos_tokens.append(self.passages[pos_pid])
+            if self.n_hard_negatives:
+                # Match the bounded cached path on a first (uncached) load.
+                candidates = self.train_negatives[qid][:self.n_hard_negatives]
+                chosen = random.sample(candidates, self.n_hard_negatives) \
+                    if len(candidates) >= self.n_hard_negatives \
+                    else random.choices(candidates, k=self.n_hard_negatives)
+                neg_tokens.extend(self.passages[pid] for pid in chosen)
 
         q_ids, q_mask = _collate(query_tokens, self.max_len)
         p_ids, p_mask = _collate(pos_tokens, self.max_len)
 
-        return {
+        result = {
             "query_ids": q_ids,
             "query_mask": q_mask,
             "pos_ids": p_ids,
             "pos_mask": p_mask,
+            "positive_groups": torch.tensor([_stable_group(pid) for pid in pos_pids]),
+            "query_groups": torch.tensor([_stable_group(qid) for qid in qids]),
         }
+        if neg_tokens:
+            n_ids, n_mask = _collate(neg_tokens, self.max_len)
+            result["neg_ids"] = n_ids.reshape(batch_size, self.n_hard_negatives, -1)
+            result["neg_mask"] = n_mask.reshape(batch_size, self.n_hard_negatives, -1)
+        return result
 
     def get_dev_data(self) -> tuple[dict, dict]:
         """Return (dev_queries, dev_qrels) for MRR@10 evaluation."""
         return self.dev_queries, self.dev_qrels
+
+
+def _stable_group(identifier):
+    """Stable across processes and microbatches (unlike Python's hash())."""
+    return int.from_bytes(hashlib.blake2b(str(identifier).encode(), digest_size=8).digest(), "big") & ((1 << 63) - 1)
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,13 @@
 # PRISM: Experiment Progress
 
+> **Correction notice — revival audit:** the historical results below are not
+> current evidence of an advantage over optimized attention. Padding leakage,
+> detached learned decays, microbatch-only contrastive negatives, and target-set
+> checkpoint selection affected the earlier implementation. The Transformer
+> also requested unused attention weights. See `REVIVAL_REPORT.md` for fixes,
+> measured CPU results, and the pending clean GPU comparison. Historical numbers
+> are retained here for provenance, not endorsed as corrected measurements.
+
 ## Current Status: Paper Experiment Infrastructure (complete)
 
 All 7 paper experiment runners are implemented and smoke-tested. The full pipeline is
